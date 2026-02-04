@@ -336,3 +336,152 @@ flowchart TD
 ```
 
 ---
+
+
+## Wireframes/Mock diagrams of the proposed solution (optional)
+
+### 1. Student Dashboard with AI Risk Alerts
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ EduOS Platform                    🔔 Notifications    👤 Admin  ⚙️      │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  📊 Student Dashboard                                    🔍 Search...   │
+│                                                                          │
+│  ⚠️ 12 Students at High Risk - Requires Attention                       │
+│                                                                          │
+│  ┌────────────────────────────────────────────────────────────────┐   │
+│  │ Name          Class    Risk Score    Last Activity    Action   │   │
+│  ├────────────────────────────────────────────────────────────────┤   │
+│  │ 🔴 Rahul Kumar  10-A      92%       3 days ago      [Review]   │   │
+│  │    ⚠️ Risk: 3 missed assignments, 2 absences this week         │   │
+│  ├────────────────────────────────────────────────────────────────┤   │
+│  │ 🟡 Priya Singh  10-B      78%       1 day ago       [Review]   │   │
+│  │    ⚠️ Risk: Sudden drop in LMS activity (50% decrease)         │   │
+│  ├────────────────────────────────────────────────────────────────┤   │
+│  │ 🟢 Amit Patel   10-A      15%       Today           [View]     │   │
+│  │    ✓ On track - Regular attendance and submissions             │   │
+│  └────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+│  📈 Class Performance Trends                                            │
+│  ┌────────────────────────────────────────────────────────────────┐   │
+│  │     Attendance    Assignments    Engagement                     │   │
+│  │  ██████████████   ████████████   ██████████                     │   │
+│  │      85%              78%            72%                        │   │
+│  └────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 2. Duplicate Detection Review Interface
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ EduOS Platform - Duplicate Detection Review                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  🔍 Potential Duplicate Detected - Likelihood: 87%                      │
+│                                                                          │
+│  ┌──────────────────────────────┬──────────────────────────────┐       │
+│  │  NEW SUBMISSION              │  EXISTING RECORD             │       │
+│  ├──────────────────────────────┼──────────────────────────────┤       │
+│  │  Name: Rahul Kumar           │  Name: Rahul Kumarr          │       │
+│  │  DOB: 15/08/2010             │  DOB: 15/08/2010             │       │
+│  │  Father: Rajesh Kumar        │  Father: Rajesh K.           │       │
+│  │  Contact: 9876543210         │  Contact: 9876543210         │       │
+│  │  Address: Delhi              │  Address: New Delhi          │       │
+│  └──────────────────────────────┴──────────────────────────────┘       │
+│                                                                          │
+│  🤖 AI Analysis:                                                        │
+│  ┌────────────────────────────────────────────────────────────────┐   │
+│  │ • Name similarity: 95% (phonetic match detected)               │   │
+│  │ • DOB: Exact match                                             │   │
+│  │ • Contact: Exact match                                         │   │
+│  │ • Address: Semantic match (Delhi ≈ New Delhi)                  │   │
+│  │                                                                 │   │
+│  │ Recommendation: High confidence duplicate                      │   │
+│  │ Reason: Multiple exact matches + semantic similarity           │   │
+│  └────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+│  Decision Required:                                                     │
+│  [✓ Merge Records]  [Create New Student]  [Not a Duplicate]           │
+│                                                                          │
+│  Merge Reason: _______________________________________________          │
+│                                                                          │
+│  [Cancel]                                            [Submit Decision]  │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 3. Mobile Offline Attendance Interface
+
+```
+┌─────────────────────────────────┐
+│  EduOS Mobile                   │
+│  ☰  Attendance  🔄 Pending: 3   │
+├─────────────────────────────────┤
+│                                 │
+│  Class: 10-A                    │
+│  Date: 04/02/2026               │
+│  Time: 09:30 AM                 │
+│                                 │
+│  📶 Offline Mode                │
+│  Data will sync when online     │
+│                                 │
+│  ┌─────────────────────────┐   │
+│  │ Roll  Name         P  A │   │
+│  ├─────────────────────────┤   │
+│  │  1   Rahul Kumar  ✓  ○ │   │
+│  │  2   Priya Singh  ✓  ○ │   │
+│  │  3   Amit Patel   ○  ✓ │   │
+│  │  4   Neha Sharma  ✓  ○ │   │
+│  │  5   Rohan Gupta  ✓  ○ │   │
+│  └─────────────────────────┘   │
+│                                 │
+│  Present: 4  Absent: 1          │
+│                                 │
+│  [Save Locally]  [Mark All]    │
+│                                 │
+│  ⚠️ 3 records pending sync      │
+│  [Sync Now]                     │
+│                                 │
+└─────────────────────────────────┘
+```
+
+### 4. AI Governance Dashboard
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ EduOS Platform - AI Governance Dashboard                                │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  🤖 AI System Status                          🔴 AI Kill Switch: OFF   │
+│                                                                          │
+│  ┌────────────────────────────────────────────────────────────────┐   │
+│  │ Model Performance (Last 30 Days)                               │   │
+│  ├────────────────────────────────────────────────────────────────┤   │
+│  │ Duplicate Detection:    Accuracy: 94%    Precision: 96%       │   │
+│  │ Risk Prediction:        Accuracy: 89%    Recall: 87%          │   │
+│  │ Anomaly Detection:      True Positive: 92%  False Positive: 8%│   │
+│  └────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+│  📊 Fairness Monitoring                                                 │
+│  ┌────────────────────────────────────────────────────────────────┐   │
+│  │ Risk Score Distribution by Demographics:                       │   │
+│  │                                                                 │   │
+│  │ Gender:     Male: 23%  Female: 21%  ✓ No bias detected        │   │
+│  │ Location:   Urban: 22% Rural: 24%   ✓ No bias detected        │   │
+│  │ Category:   General: 22% SC/ST: 23% ✓ No bias detected        │   │
+│  └────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+│  🔍 Pending Human Review: 15 items                                      │
+│  ┌────────────────────────────────────────────────────────────────┐   │
+│  │ • 8 Duplicate detections (avg confidence: 82%)                 │   │
+│  │ • 5 Attendance anomalies (impossible travel)                   │   │
+│  │ • 2 Schedule conflicts (room double-booking)                   │   │
+│  └────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+│  [View Review Queue]  [Model Retraining]  [Export Audit Report]       │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
