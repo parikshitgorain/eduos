@@ -614,3 +614,94 @@ graph TB
 - 7-99 year log retention (tier-based)
 
 ---
+
+
+## Technologies to be used in the solution
+
+### Frontend Technologies
+- **Next.js 14** - React framework for web application with SSR/SSG capabilities
+- **React Native** - Cross-platform mobile app development for iOS/Android
+- **TypeScript** - Type-safe JavaScript for better code quality
+- **Tailwind CSS** - Utility-first CSS framework for responsive design
+- **Zustand** - Lightweight state management
+- **React Hook Form** - Performant form validation
+- **SQLite** - Local database for offline-first mobile functionality
+
+### Backend Technologies
+- **Node.js / Go** - Core backend services (Go for CPU-intensive operations)
+- **Express.js / Fastify** - Web framework for Node.js services
+- **Python 3.11+ with FastAPI** - AI inference layer for ML models
+- **JWT (RS256)** - Secure authentication tokens
+- **OAuth 2.0 / OIDC** - SSO and third-party authentication
+
+### AI/ML Technologies
+- **sentence-transformers (SBERT)** - Semantic embeddings for duplicate detection (768-dim vectors)
+- **scikit-learn** - Isolation Forest for anomaly detection, Logistic Regression
+- **XGBoost** - Gradient boosting for academic risk prediction
+- **SHAP** - Explainability library for AI model interpretability
+- **Pydantic** - Data validation for AI service inputs/outputs
+- **Celery** - Distributed task queue for async AI processing
+
+### Database & Storage
+- **PostgreSQL 14+** - Primary ACID-compliant database with JSONB support
+- **Row-Level Security (RLS)** - Multi-tenant data isolation
+- **Redis 7+** - In-memory cache, session store, rate limiting
+- **AWS S3 / MinIO** - Object storage for media files with lifecycle policies
+- **PgBouncer** - PostgreSQL connection pooling
+
+### Message Queue & Async Processing
+- **RabbitMQ / AWS SQS** - Message queue for async jobs, notifications, AI requests
+- **Bull** - Redis-based queue for Node.js background jobs
+
+### API & Integration
+- **Kong / AWS API Gateway** - API gateway with rate limiting, OAuth enforcement
+- **OpenAPI 3.0** - API documentation and specification
+- **Webhook Signing (HMAC-SHA256)** - Secure webhook verification
+- **LTI 1.3** - Learning Tools Interoperability standard
+- **OneRoster v1.1** - Student information system data exchange
+
+### Security & Compliance
+- **AES-256** - Encryption at rest
+- **TLS 1.3** - Encryption in transit
+- **SHA-256** - Cryptographic hashing for audit trails and snapshots
+- **MFA (TOTP)** - Multi-factor authentication
+- **SAML 2.0** - Enterprise SSO integration
+
+### DevOps & Infrastructure
+- **Docker** - Containerization for consistent deployments
+- **Kubernetes (K8s)** - Container orchestration, auto-scaling, rolling updates
+- **NGINX** - Ingress controller and reverse proxy
+- **GitHub Actions / GitLab CI** - CI/CD pipelines with automated testing
+
+### Monitoring & Observability
+- **Prometheus** - Metrics collection and alerting
+- **Grafana** - Dashboards and visualization
+- **ELK Stack** (Elasticsearch, Logstash, Kibana) - Centralized logging and audit trails
+- **Jaeger / AWS X-Ray** - Distributed tracing for request flow analysis
+- **Sentry** - Error tracking and performance monitoring
+
+### AWS Services (Recommended Deployment)
+- **Amazon EKS** - Managed Kubernetes service
+- **Amazon RDS for PostgreSQL** - Managed database with automated backups
+- **Amazon ElastiCache for Redis** - Managed Redis cluster
+- **Amazon S3** - Object storage with lifecycle management
+- **Amazon SQS** - Managed message queue
+- **AWS Lambda** - Serverless functions for event-driven tasks
+- **Amazon CloudWatch** - Monitoring and logging
+- **AWS Secrets Manager** - Secure credential storage
+- **Amazon Route 53** - DNS and traffic management
+- **AWS WAF** - Web application firewall for security
+
+### Development & Testing
+- **Jest / Vitest** - Unit testing framework
+- **Cypress / Playwright** - End-to-end testing
+- **Postman / Insomnia** - API testing
+- **k6 / Artillery** - Load testing and performance benchmarking
+
+### Localization & Accessibility
+- **i18next** - Internationalization for 10 Indian languages
+- **react-i18next** - React integration for translations
+- **WCAG 2.1 AA** - Accessibility compliance standards
+- **NVDA / VoiceOver** - Screen reader compatibility testing
+
+---
