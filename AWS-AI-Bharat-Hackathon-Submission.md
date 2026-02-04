@@ -709,17 +709,20 @@ graph TB
 
 ## Estimated implementation cost (optional)
 
-### Development Phase (16 Weeks - 4 Phases)
+### Development Phase (AI-Accelerated)
 
 **Team Composition:**
 - 2 Full-Stack Developers (Node.js/React): ₹80,000/month each
 - 1 AI/ML Engineer (Python): ₹1,00,000/month
 - 1 DevOps Engineer: ₹70,000/month
 - 1 UI/UX Designer: ₹50,000/month
-- 1 QA Engineer: ₹50,000/month
-- 1 Project Manager: ₹60,000/month
 
-**Total Team Cost (4 months):** ₹19,60,000 (~$23,500 USD)
+**AI Development Tools:**
+- GitHub Copilot / Cursor AI: ₹2,000/month
+- AI-assisted code generation and testing
+- 40% faster development cycle
+
+**Estimated Development Cost:** ₹12,00,000 (~$14,400 USD)
 
 ### Infrastructure Cost (Monthly - AWS)
 
@@ -756,7 +759,9 @@ graph TB
 
 ### Total Implementation Cost Summary
 
-**One-Time Development:** ₹19,60,000 (~$23,500 USD)
+**One-Time Development:** ₹12,00,000 (~$14,400 USD)
+- AI-accelerated development reduces time and cost by 40%
+- Leverages GitHub Copilot, Cursor AI, and automated testing tools
 
 **Ongoing Monthly Costs:**
 - Basic Tier: ₹31,700/month (~$380 USD/month)
