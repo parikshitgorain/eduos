@@ -210,3 +210,129 @@ graph LR
 
 ---
 
+
+
+---
+
+## Process flow diagram or Use-case diagram
+
+### Use Case: AI-Powered Academic Risk Prediction
+
+```mermaid
+sequenceDiagram
+    participant Teacher
+    participant WebApp
+    participant CoreService
+    participant AIService
+    participant Database
+    participant Counselor
+
+    Note over AIService: Nightly Batch Process
+    AIService->>Database: Fetch student data (attendance, assignments, LMS activity)
+    Database-->>AIService: Return student records
+    AIService->>AIService: XGBoost Model: Compute Risk Score (0-100)
+    AIService->>AIService: Generate SHAP values (explainability)
+    AIService->>Database: Store risk scores + explanations
+    
+    Note over Teacher,Counselor: Next Day - Morning
+    Teacher->>WebApp: Open Student Dashboard
+    WebApp->>CoreService: Request student list
+    CoreService->>Database: Query students with risk scores
+    Database-->>CoreService: Return students + risk flags
+    CoreService-->>WebApp: Display students (high-risk highlighted)
+    WebApp-->>Teacher: Show risk alerts
+    
+    Teacher->>WebApp: Click high-risk student
+    WebApp->>CoreService: Get risk details
+    CoreService->>Database: Fetch risk explanation
+    Database-->>CoreService: "Risk elevated: 3 missed assignments, 2 absences"
+    CoreService-->>WebApp: Return explanation
+    WebApp-->>Teacher: Display natural language explanation
+    
+    Teacher->>WebApp: Assign to counselor
+    WebApp->>CoreService: Create intervention task
+    CoreService->>Database: Log intervention
+    CoreService->>Counselor: Send notification
+    
+    Counselor->>WebApp: Log intervention action
+    WebApp->>AIService: Send feedback for model retraining
+```
+
+### Use Case: Offline Attendance with Anomaly Detection
+
+```mermaid
+sequenceDiagram
+    participant Teacher
+    participant MobileApp
+    participant LocalDB
+    participant AttendanceService
+    participant AIService
+    participant Admin
+
+    Note over Teacher,LocalDB: Rural Area - No Internet
+    Teacher->>MobileApp: Mark attendance (10 students)
+    MobileApp->>LocalDB: Store in SQLite with idempotency_key
+    LocalDB-->>MobileApp: Saved locally
+    MobileApp-->>Teacher: Show "Pending Sync" badge
+    
+    Note over Teacher,AttendanceService: Internet Connection Restored
+    Teacher->>MobileApp: Click "Sync Now"
+    MobileApp->>AttendanceService: Send attendance events
+    AttendanceService->>AttendanceService: Check idempotency_key (prevent duplicates)
+    AttendanceService->>AttendanceService: Normalize timezone to UTC
+    AttendanceService->>Database: Store attendance records
+    
+    AttendanceService->>AIService: Trigger anomaly detection
+    AIService->>AIService: Isolation Forest: Check for impossible travel
+    AIService->>AIService: Check for pattern breaks
+    
+    alt Anomaly Detected
+        AIService->>Database: Flag record as "verification_required"
+        AIService->>Admin: Send alert with explanation
+        Admin->>WebApp: Review flagged attendance
+        Admin->>WebApp: Approve or Reject
+    else No Anomaly
+        AIService->>Database: Mark as verified
+    end
+    
+    AttendanceService-->>MobileApp: Sync complete
+    MobileApp-->>Teacher: Show "Synced ✓"
+```
+
+### Use Case: Duplicate Student Detection with Human Approval
+
+```mermaid
+flowchart TD
+    A[Admin: Add New Student] --> B[Enter: Name, DOB, Contact]
+    B --> C[Core Service: Validate Fields]
+    C --> D[Deterministic Check: Levenshtein Distance]
+    D --> E{Score > 0.5?}
+    
+    E -->|No| F[Auto-Approve]
+    F --> G[Create Student Record]
+    G --> H[Assign UUID]
+    H --> I[Success: Student Created]
+    
+    E -->|Yes| J[AI Service: Generate SBERT Embeddings]
+    J --> K[Compute Cosine Similarity with Existing Students]
+    K --> L[Combined Score = 0.6×Deterministic + 0.4×AI]
+    L --> M{Score >= 0.75?}
+    
+    M -->|No| F
+    M -->|Yes| N[Add to Review Queue]
+    N --> O[Show Side-by-Side Comparison]
+    O --> P[Display: Likelihood Score + Reason Codes]
+    P --> Q{Admin Decision}
+    
+    Q -->|Create New| R[Create Snapshot for Audit]
+    R --> G
+    
+    Q -->|Merge Records| S[Create Pre-Merge Snapshot]
+    S --> T[Execute Merge with Canonical Precedence]
+    T --> U[Generate merge_id + Audit Log]
+    U --> V[Success: Records Merged]
+    
+    Q -->|Not a Duplicate| R
+```
+
+---
