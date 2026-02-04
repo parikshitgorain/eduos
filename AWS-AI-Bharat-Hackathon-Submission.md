@@ -724,10 +724,10 @@ graph TB
 - **Enterprise (100,000+ students):** ₹2,50,000/month (~$3,000/month)
 
 **Development Team:**
-- 5-person team with AI-accelerated tools: ₹12 lakhs one-time
+- 4-person team with AI-accelerated tools: ₹10 lakhs one-time
 - 40% faster development using GitHub Copilot, Cursor AI
 
-**Total Initial Investment:** ₹12 lakhs (~$14,400 USD)
+**Total Initial Investment:** ₹10 lakhs (~$12,000 USD)
 
 **Revenue Model:** ₹200-600 per student/year
 **Break-even:** 2,000-5,000 students
