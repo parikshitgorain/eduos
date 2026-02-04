@@ -485,3 +485,132 @@ flowchart TD
 ```
 
 ---
+
+
+## Architecture diagram of the proposed solution
+
+### System Architecture Overview
+
+EduOS employs a **Hybrid Architecture** that separates the deterministic System of Record from the AI-powered System of Intelligence, ensuring data integrity while leveraging AI for advisory capabilities.
+
+```mermaid
+graph TB
+    subgraph "Frontend Layer"
+        A[Next.js Web App<br/>TypeScript + React]
+        B[Mobile PWA<br/>React Native + SQLite]
+    end
+    
+    subgraph "API Gateway Layer"
+        C[Kong API Gateway<br/>Rate Limiting + OAuth 2.0]
+    end
+    
+    subgraph "System of Record - Deterministic Layer"
+        D[Auth Service<br/>MFA + SSO + RBAC]
+        E[Core Service<br/>Student Identity + Hierarchy]
+        F[Forms Service<br/>Schema Engine + Snapshots]
+        G[Attendance Service<br/>Offline Sync + Timezone]
+        H[Payments Service<br/>Idempotent Webhooks + INR]
+        I[Analytics Service<br/>Reports + RLS]
+        J[Integration Service<br/>LTI 1.3 + OneRoster]
+    end
+    
+    subgraph "System of Intelligence - AI Advisory Layer"
+        K[AI Service - Python FastAPI<br/>SBERT + XGBoost + Isolation Forest]
+        L[Human Review Queue<br/>Approval Workflow]
+        M[AI Governance<br/>Fairness + Explainability + Kill Switch]
+    end
+    
+    subgraph "Data Layer"
+        N[PostgreSQL 14+<br/>RLS + JSONB + PITR]
+        O[Redis 7+<br/>Cache + Sessions + Rate Limits]
+        P[S3 Storage<br/>Media + Backups]
+        Q[RabbitMQ<br/>Async Jobs + AI Requests]
+    end
+    
+    subgraph "Observability Layer"
+        R[Prometheus + Grafana<br/>Metrics + Dashboards]
+        S[ELK Stack<br/>Logs + Audit Trails]
+        T[Jaeger<br/>Distributed Tracing]
+    end
+    
+    A --> C
+    B --> C
+    C --> D
+    C --> E
+    C --> F
+    C --> G
+    C --> H
+    C --> I
+    C --> J
+    
+    E --> K
+    G --> K
+    K --> L
+    L --> M
+    M --> E
+    
+    D --> N
+    E --> N
+    F --> N
+    G --> N
+    H --> N
+    I --> N
+    J --> N
+    K --> N
+    
+    D --> O
+    E --> O
+    F --> O
+    G --> O
+    
+    E --> P
+    G --> Q
+    H --> Q
+    K --> Q
+    
+    D --> R
+    E --> R
+    F --> R
+    G --> R
+    H --> R
+    I --> R
+    J --> R
+    K --> R
+    
+    N --> S
+    E --> S
+    K --> S
+    
+    C --> T
+    E --> T
+    K --> T
+```
+
+### Key Architectural Principles
+
+**1. Separation of Concerns:**
+- **System of Record (Deterministic)**: Handles all transactional operations, ACID compliance, audit trails
+- **System of Intelligence (AI Advisory)**: Provides predictions and recommendations, never writes directly to database
+
+**2. Human-in-the-Loop Governance:**
+- All AI outputs flow through Human Review Queue
+- Explicit approval required before database writes
+- AI Kill Switch for instant reversion to deterministic logic
+
+**3. Multi-Tenant Isolation:**
+- Row-Level Security (RLS) in PostgreSQL
+- Tenant-specific resource quotas
+- Physical separation for Enterprise tier
+
+**4. Offline-First for Bharat:**
+- SQLite local storage on mobile devices
+- Background sync with conflict resolution
+- Works seamlessly with intermittent connectivity
+
+**5. Observability & Compliance:**
+- Cryptographic audit trails (SHA-256)
+- Distributed tracing for all requests
+- Real-time metrics and alerting
+- 7-99 year log retention (tier-based)
+
+---
