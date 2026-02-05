@@ -72,7 +72,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
 
 ### 1.3 Auth Service
 
-- [ ] 1.3.1 Setup OAuth2/OIDC authentication service
+- [x] 1.3.1 Setup OAuth2/OIDC authentication service
   - **Definition of Done:**
     - Auth service supports OAuth 2.0 authorization code flow
     - OIDC discovery endpoint implemented

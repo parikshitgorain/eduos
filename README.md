@@ -64,7 +64,15 @@ EduOS is a production-grade, AI-enabled SaaS platform for educational institutio
 - ✅ Monitoring: cache hit rate > 95%
 - ✅ Fallback to database on cache miss
 
-**Next Task:** 1.3.1 - OAuth2/OIDC authentication
+#### ✅ Task 1.3.1: OAuth2/OIDC Authentication - COMPLETED
+- ✅ OAuth 2.0 authorization code flow with PKCE
+- ✅ OIDC discovery endpoint implemented
+- ✅ JWT token generation with RS256 signing
+- ✅ Token expiry: 1 hour (access), 7 days (refresh)
+- ✅ Integration with Google and Microsoft SSO
+- ✅ 22 unit tests passing
+
+**Next Task:** 1.3.2 - Hierarchical RBAC
 
 ---
 
@@ -266,6 +274,10 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 - [Task 1.2.1](docs/tasks/TASK_1.2.1_IMPLEMENTATION_SUMMARY.md) - Domain Mapping ✅
 - [Task 1.2.2](docs/tasks/TASK_1.2.2_IMPLEMENTATION_SUMMARY.md) - Domain Verification ✅
 - [Task 1.2.3](docs/tasks/TASK_1.2.3_IMPLEMENTATION_SUMMARY.md) - Cache Layer ✅
+- [Task 1.3.1](docs/tasks/TASK_1.3.1_IMPLEMENTATION_SUMMARY.md) - OAuth2/OIDC Authentication ✅
+
+**Authentication:**
+- [Auth Service](docs/AUTH_SERVICE.md) - OAuth2/OIDC authentication service
 
 **Domain & Caching:**
 - [Domain Mapping](docs/DOMAIN_MAPPING.md) - Custom domain resolution
@@ -284,7 +296,7 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 - [x] Task 1.2.1: Custom domain mapping ✅
 - [x] Task 1.2.2: Domain verification workflow ✅
 - [x] Task 1.2.3: Tenant routing cache ✅
-- [ ] Task 1.3.1: OAuth2/OIDC authentication
+- [x] Task 1.3.1: OAuth2/OIDC authentication ✅
 - [ ] Task 1.3.2: Hierarchical RBAC
 - [ ] Task 1.3.3: Session management
 - [ ] Task 1.3.4: Multi-factor authentication
@@ -426,6 +438,6 @@ Built with:
 
 ---
 
-**Project Status:** Phase 1 - Task 1.2.3 Complete ✅  
-**Next Milestone:** Task 1.3.1 - OAuth2/OIDC authentication  
+**Project Status:** Phase 1 - Task 1.3.1 Complete ✅  
+**Next Milestone:** Task 1.3.2 - Hierarchical RBAC  
 **Last Updated:** 2026-02-05

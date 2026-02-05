@@ -70,6 +70,10 @@ app.use('/api/v1/tenants', tenantRoutes);
 const cacheRoutes = require('./routes/cache');
 app.use('/api/v1/cache', cacheRoutes);
 
+// Authentication routes (no tenant context required - these create sessions)
+const authRoutes = require('./routes/auth');
+app.use('/auth', authRoutes);
+
 // Domain management routes (require tenant context)
 const domainRoutes = require('./routes/domains');
 
@@ -178,10 +182,19 @@ app.use((req, res) => {
 // Start server only if not in test mode
 let server;
 if (process.env.NODE_ENV !== 'test') {
-  server = app.listen(PORT, () => {
+  server = app.listen(PORT, async () => {
     console.log(`EduOS Platform API listening on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`Health check: http://localhost:${PORT}/health`);
+    
+    // Initialize authentication service
+    try {
+      const authService = require('./services/authService');
+      await authService.initialize();
+      console.log('Authentication service initialized');
+    } catch (error) {
+      console.error('Failed to initialize authentication service:', error.message);
+    }
     
     // Start background jobs
     const { startJob } = require('./jobs/domainVerificationJob');
