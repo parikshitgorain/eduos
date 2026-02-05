@@ -20,6 +20,7 @@ describe('Schema Migration Service', () => {
   
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.resetAllMocks();
   });
   
   describe('analyzeMigrationImpact', () => {
@@ -357,28 +358,48 @@ describe('Schema Migration Service', () => {
     });
     
     it('should execute migration successfully', async () => {
-      const mockDryRunReport = {
-        dry_run_id: 'dry-run-1',
-        recommendation: { status: 'safe' }
+      // Mock schema snapshots for dry-run
+      const fromSchema = {
+        snapshot_id: mockFromSnapshotId,
+        form_type: 'student_enrollment',
+        semantic_version: 'v1.0.0',
+        fields: [
+          { field_name: 'first_name', field_type: 'text', is_required: true, validation_rules: {} }
+        ]
       };
       
-      // Mock runDryRunMigration to avoid calling analyzeMigrationImpact
-      const runDryRunSpy = jest.spyOn(migrationService, 'runDryRunMigration')
-        .mockResolvedValue(mockDryRunReport);
+      const toSchema = {
+        snapshot_id: mockToSnapshotId,
+        form_type: 'student_enrollment',
+        semantic_version: 'v1.1.0',
+        fields: [
+          { field_name: 'first_name', field_type: 'text', is_required: true, validation_rules: {} },
+          { field_name: 'email', field_type: 'email', is_required: false, validation_rules: {} }
+        ]
+      };
       
-      // Mock create migration record
+      schemaService.getSchemaSnapshotById
+        .mockResolvedValueOnce(fromSchema)
+        .mockResolvedValueOnce(toSchema)
+        .mockResolvedValueOnce(toSchema);
+      
+      // Mock queries in order:
+      // 1. Sample records for dry-run
+      // 2. Count for dry-run
+      // 3. Store dry-run report
+      // 4. Create migration record
+      // 5. Update migration record
       query
-        .mockResolvedValueOnce({
-          rows: [{ migration_id: 'migration-1' }]
-        })
-        // Mock update migration record
-        .mockResolvedValueOnce({
-          rows: [{ migration_id: 'migration-1', migration_status: 'completed' }]
-        });
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] })
+        .mockResolvedValueOnce({ rows: [{ dry_run_id: 'dry-run-1' }] })
+        .mockResolvedValueOnce({ rows: [{ migration_id: 'migration-1' }] })
+        .mockResolvedValueOnce({ rows: [{ migration_id: 'migration-1', migration_status: 'completed' }] });
       
       // Mock transaction for migration execution
       const mockClient = {
         query: jest.fn()
+          .mockResolvedValueOnce({ rows: [] }) // SET LOCAL statement_timeout
           .mockResolvedValueOnce({ rows: [{ snapshot_id: 'snap-1' }] }) // before snapshot
           .mockResolvedValueOnce({ rows: [{ record_id: 'rec1' }, { record_id: 'rec2' }] }) // update records
           .mockResolvedValueOnce({ rows: [{ snapshot_id: 'snap-2' }] }) // after snapshot
@@ -400,27 +421,40 @@ describe('Schema Migration Service', () => {
       expect(result.records_migrated).toBe(2);
       expect(result).toHaveProperty('migration_id');
       expect(result).toHaveProperty('duration_ms');
-      
-      runDryRunSpy.mockRestore();
     });
     
     it('should block migration with breaking changes unless forced', async () => {
-      const mockDryRunReport = {
-        dry_run_id: 'dry-run-1',
-        recommendation: { status: 'caution' }
+      // Mock schema snapshots with breaking changes
+      const fromSchema = {
+        snapshot_id: mockFromSnapshotId,
+        form_type: 'student_enrollment',
+        semantic_version: 'v1.0.0',
+        fields: [
+          { field_name: 'first_name', field_type: 'text', is_required: true, validation_rules: {} },
+          { field_name: 'middle_name', field_type: 'text', is_required: false, validation_rules: {} }
+        ]
       };
       
-      const runDryRunSpy = jest.spyOn(migrationService, 'runDryRunMigration')
-        .mockResolvedValue(mockDryRunReport);
+      const toSchema = {
+        snapshot_id: mockToSnapshotId,
+        form_type: 'student_enrollment',
+        semantic_version: 'v2.0.0',
+        fields: [
+          { field_name: 'first_name', field_type: 'text', is_required: true, validation_rules: {} }
+        ]
+      };
+      
+      schemaService.getSchemaSnapshotById
+        .mockResolvedValueOnce(fromSchema)
+        .mockResolvedValueOnce(toSchema)
+        .mockResolvedValueOnce(toSchema);
       
       query
-        .mockResolvedValueOnce({
-          rows: [{ migration_id: 'migration-1' }]
-        })
-        // Mock update migration record for failure
-        .mockResolvedValueOnce({
-          rows: [{ migration_id: 'migration-1', migration_status: 'failed' }]
-        });
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] })
+        .mockResolvedValueOnce({ rows: [{ dry_run_id: 'dry-run-1' }] })
+        .mockResolvedValueOnce({ rows: [{ migration_id: 'migration-1' }] })
+        .mockResolvedValueOnce({ rows: [{ migration_id: 'migration-1', migration_status: 'failed' }] });
       
       await expect(
         migrationService.executeMigration(
@@ -431,26 +465,40 @@ describe('Schema Migration Service', () => {
           { tier: 'basic' }
         )
       ).rejects.toThrow('breaking changes');
-      
-      runDryRunSpy.mockRestore();
     });
     
     it('should allow forced execution of breaking changes', async () => {
-      const mockDryRunReport = {
-        dry_run_id: 'dry-run-1',
-        recommendation: { status: 'caution' }
+      // Mock schema snapshots with breaking changes
+      const fromSchema = {
+        snapshot_id: mockFromSnapshotId,
+        form_type: 'student_enrollment',
+        semantic_version: 'v1.0.0',
+        fields: [
+          { field_name: 'first_name', field_type: 'text', is_required: true, validation_rules: {} },
+          { field_name: 'middle_name', field_type: 'text', is_required: false, validation_rules: {} }
+        ]
       };
       
-      const runDryRunSpy = jest.spyOn(migrationService, 'runDryRunMigration')
-        .mockResolvedValue(mockDryRunReport);
+      const toSchema = {
+        snapshot_id: mockToSnapshotId,
+        form_type: 'student_enrollment',
+        semantic_version: 'v2.0.0',
+        fields: [
+          { field_name: 'first_name', field_type: 'text', is_required: true, validation_rules: {} }
+        ]
+      };
+      
+      schemaService.getSchemaSnapshotById
+        .mockResolvedValueOnce(fromSchema)
+        .mockResolvedValueOnce(toSchema)
+        .mockResolvedValueOnce(toSchema);
       
       query
-        .mockResolvedValueOnce({
-          rows: [{ migration_id: 'migration-1' }]
-        })
-        .mockResolvedValueOnce({
-          rows: [{ migration_id: 'migration-1', migration_status: 'completed' }]
-        });
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] })
+        .mockResolvedValueOnce({ rows: [{ dry_run_id: 'dry-run-1' }] })
+        .mockResolvedValueOnce({ rows: [{ migration_id: 'migration-1' }] })
+        .mockResolvedValueOnce({ rows: [{ migration_id: 'migration-1', migration_status: 'completed' }] });
       
       const mockClient = {
         query: jest.fn()
@@ -472,24 +520,39 @@ describe('Schema Migration Service', () => {
       );
       
       expect(result.status).toBe('completed');
-      
-      runDryRunSpy.mockRestore();
     });
     
     it('should handle migration failure and update status', async () => {
-      const runDryRunSpy = jest.spyOn(migrationService, 'runDryRunMigration')
-        .mockResolvedValue({
-          dry_run_id: 'dry-run-1',
-          recommendation: { status: 'safe' }
-        });
+      // Mock schema snapshots
+      const fromSchema = {
+        snapshot_id: mockFromSnapshotId,
+        form_type: 'student_enrollment',
+        semantic_version: 'v1.0.0',
+        fields: [
+          { field_name: 'first_name', field_type: 'text', is_required: true, validation_rules: {} }
+        ]
+      };
+      
+      const toSchema = {
+        snapshot_id: mockToSnapshotId,
+        form_type: 'student_enrollment',
+        semantic_version: 'v1.1.0',
+        fields: [
+          { field_name: 'first_name', field_type: 'text', is_required: true, validation_rules: {} }
+        ]
+      };
+      
+      schemaService.getSchemaSnapshotById
+        .mockResolvedValueOnce(fromSchema)
+        .mockResolvedValueOnce(toSchema)
+        .mockResolvedValueOnce(toSchema);
       
       query
-        .mockResolvedValueOnce({
-          rows: [{ migration_id: 'migration-1' }]
-        })
-        .mockResolvedValueOnce({
-          rows: [{ migration_id: 'migration-1', migration_status: 'failed' }]
-        });
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] })
+        .mockResolvedValueOnce({ rows: [{ dry_run_id: 'dry-run-1' }] })
+        .mockResolvedValueOnce({ rows: [{ migration_id: 'migration-1' }] })
+        .mockResolvedValueOnce({ rows: [{ migration_id: 'migration-1', migration_status: 'failed' }] });
       
       transaction.mockRejectedValue(new Error('Database error'));
       
@@ -502,27 +565,31 @@ describe('Schema Migration Service', () => {
           { tier: 'enterprise' }
         )
       ).rejects.toThrow('Database error');
-      
-      runDryRunSpy.mockRestore();
     });
   });
   
   describe('getMigrationHistory', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+    
     it('should return paginated migration history', async () => {
       query
         .mockResolvedValueOnce({
           rows: [
             {
-              migration_id: 'mig1',
+              migration_id: 'migration-1',
               from_version: 'v1.0.0',
               to_version: 'v1.1.0',
-              migration_status: 'completed'
+              migration_status: 'completed',
+              form_type: 'student_enrollment'
             },
             {
-              migration_id: 'mig2',
+              migration_id: 'migration-2',
               from_version: 'v1.1.0',
               to_version: 'v1.2.0',
-              migration_status: 'completed'
+              migration_status: 'completed',
+              form_type: 'student_enrollment'
             }
           ]
         })
@@ -545,8 +612,11 @@ describe('Schema Migration Service', () => {
         .mockResolvedValueOnce({
           rows: [
             {
-              migration_id: 'mig1',
-              migration_status: 'failed'
+              migration_id: 'migration-1',
+              migration_status: 'failed',
+              from_version: 'v1.0.0',
+              to_version: 'v1.1.0',
+              form_type: 'student_enrollment'
             }
           ]
         })
@@ -564,12 +634,17 @@ describe('Schema Migration Service', () => {
   });
   
   describe('getMigrationDetails', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+    
     it('should return migration details with dry-run report', async () => {
       const mockMigration = {
         migration_id: 'mig1',
         from_version: 'v1.0.0',
         to_version: 'v1.1.0',
         migration_status: 'completed',
+        form_type: 'student_enrollment',
         dry_run_report: { dry_run_id: 'dry-run-1' }
       };
       

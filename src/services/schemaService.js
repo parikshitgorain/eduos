@@ -779,6 +779,302 @@ async function updateSchemaStatus(snapshotId, tenantId, newStatus) {
   return result.rows[0];
 }
 
+/**
+ * Render a student record using its original schema snapshot
+ * Task: 2.2.5 - Historic rendering with snapshot association
+ */
+async function renderRecordWithSnapshot(recordId, tenantId) {
+  // Fetch the record with its snapshot reference
+  const recordSql = `
+    SELECT 
+      sr.record_id,
+      sr.student_id,
+      sr.snapshot_id,
+      sr.data,
+      sr.created_at,
+      sr.updated_at,
+      ss.semantic_version,
+      ss.schema_definition,
+      ss.schema_hash,
+      ss.created_at AS schema_created_at,
+      ss.form_type
+    FROM student_records sr
+    JOIN schema_snapshots ss ON sr.snapshot_id = ss.snapshot_id
+    WHERE sr.record_id = $1 AND sr.tenant_id = $2
+  `;
+  
+  const result = await query(recordSql, [recordId, tenantId]);
+  
+  if (result.rows.length === 0) {
+    throw new Error(`Student record not found: ${recordId}`);
+  }
+  
+  const record = result.rows[0];
+  
+  // Verify schema integrity before rendering
+  const computedHash = computeSchemaHash(record.schema_definition);
+  if (computedHash !== record.schema_hash) {
+    throw new Error(`Schema integrity check failed for snapshot ${record.snapshot_id}. Possible tampering detected.`);
+  }
+  
+  // Get field definitions for the snapshot
+  const fieldsSql = `
+    SELECT * FROM field_definitions
+    WHERE snapshot_id = $1
+    ORDER BY display_order ASC, field_name ASC
+  `;
+  
+  const fieldsResult = await query(fieldsSql, [record.snapshot_id]);
+  
+  // Render the record data using the original schema
+  const renderedFields = fieldsResult.rows.map(field => {
+    const fieldValue = record.data[field.field_name];
+    
+    return {
+      field_name: field.field_name,
+      field_type: field.field_type,
+      label: field.label,
+      description: field.description,
+      value: fieldValue,
+      display_order: field.display_order,
+      is_required: field.is_required,
+      field_options: field.field_options
+    };
+  });
+  
+  return {
+    record_id: record.record_id,
+    student_id: record.student_id,
+    snapshot_id: record.snapshot_id,
+    schema_version: record.semantic_version,
+    schema_created_at: record.schema_created_at,
+    form_type: record.form_type,
+    record_created_at: record.created_at,
+    record_updated_at: record.updated_at,
+    fields: renderedFields,
+    schema_version_badge: `Schema ${record.semantic_version} - ${new Date(record.schema_created_at).toLocaleDateString()}`,
+    integrity_verified: true,
+    verification_timestamp: new Date()
+  };
+}
+
+/**
+ * Render multiple records with their snapshots (batch operation)
+ */
+async function renderRecordsWithSnapshots(recordIds, tenantId) {
+  if (!Array.isArray(recordIds) || recordIds.length === 0) {
+    throw new Error('recordIds must be a non-empty array');
+  }
+  
+  const results = [];
+  
+  for (const recordId of recordIds) {
+    try {
+      const rendered = await renderRecordWithSnapshot(recordId, tenantId);
+      results.push(rendered);
+    } catch (error) {
+      results.push({
+        record_id: recordId,
+        error: error.message,
+        integrity_verified: false
+      });
+    }
+  }
+  
+  return results;
+}
+
+/**
+ * Get all records for a student across different schema versions
+ */
+async function getStudentRecordHistory(studentId, tenantId) {
+  const sql = `
+    SELECT 
+      sr.record_id,
+      sr.snapshot_id,
+      sr.data,
+      sr.created_at,
+      sr.updated_at,
+      ss.semantic_version,
+      ss.form_type,
+      ss.schema_hash,
+      ss.created_at AS schema_created_at
+    FROM student_records sr
+    JOIN schema_snapshots ss ON sr.snapshot_id = ss.snapshot_id
+    WHERE sr.student_id = $1 AND sr.tenant_id = $2
+    ORDER BY sr.created_at DESC
+  `;
+  
+  const result = await query(sql, [studentId, tenantId]);
+  
+  return result.rows.map(record => ({
+    record_id: record.record_id,
+    snapshot_id: record.snapshot_id,
+    schema_version: record.semantic_version,
+    form_type: record.form_type,
+    created_at: record.created_at,
+    updated_at: record.updated_at,
+    schema_created_at: record.schema_created_at,
+    schema_version_badge: `Schema ${record.semantic_version} - ${new Date(record.schema_created_at).toLocaleDateString()}`
+  }));
+}
+
+/**
+ * Transform a record from one schema version to another (admin-initiated export)
+ * This creates a NEW artifact and does NOT modify the original record
+ */
+async function transformRecordToNewSchema(recordId, targetSnapshotId, tenantId, transformedBy, fieldMappings = {}) {
+  return await transaction(async (client) => {
+    // Get the original record
+    const recordSql = `
+      SELECT 
+        sr.record_id,
+        sr.student_id,
+        sr.snapshot_id AS source_snapshot_id,
+        sr.data AS source_data,
+        ss.semantic_version AS source_version
+      FROM student_records sr
+      JOIN schema_snapshots ss ON sr.snapshot_id = ss.snapshot_id
+      WHERE sr.record_id = $1 AND sr.tenant_id = $2
+    `;
+    
+    const recordResult = await client.query(recordSql, [recordId, tenantId]);
+    
+    if (recordResult.rows.length === 0) {
+      throw new Error(`Student record not found: ${recordId}`);
+    }
+    
+    const sourceRecord = recordResult.rows[0];
+    
+    // Get the target schema
+    const targetSnapshot = await getSchemaSnapshotById(targetSnapshotId, tenantId);
+    
+    if (!targetSnapshot) {
+      throw new Error(`Target schema snapshot not found: ${targetSnapshotId}`);
+    }
+    
+    // Verify target schema integrity
+    const computedHash = computeSchemaHash(targetSnapshot.schema_definition);
+    if (computedHash !== targetSnapshot.schema_hash) {
+      throw new Error(`Target schema integrity check failed. Possible tampering detected.`);
+    }
+    
+    // Transform the data based on field mappings
+    const transformedData = {};
+    
+    for (const targetField of targetSnapshot.fields) {
+      const sourceFieldName = fieldMappings[targetField.field_name] || targetField.field_name;
+      
+      if (sourceRecord.source_data[sourceFieldName] !== undefined) {
+        transformedData[targetField.field_name] = sourceRecord.source_data[sourceFieldName];
+      } else if (targetField.default_value !== null) {
+        transformedData[targetField.field_name] = targetField.default_value;
+      } else if (targetField.is_required) {
+        throw new Error(`Required field '${targetField.field_name}' has no mapping and no default value`);
+      }
+    }
+    
+    // Create transformation log
+    const transformLogSql = `
+      INSERT INTO schema_transformations (
+        tenant_id,
+        source_record_id,
+        source_snapshot_id,
+        target_snapshot_id,
+        field_mappings,
+        source_data,
+        transformed_data,
+        transformed_by,
+        transformation_status
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING *
+    `;
+    
+    const transformResult = await client.query(transformLogSql, [
+      tenantId,
+      recordId,
+      sourceRecord.source_snapshot_id,
+      targetSnapshotId,
+      fieldMappings,
+      sourceRecord.source_data,
+      transformedData,
+      transformedBy,
+      'completed'
+    ]);
+    
+    return {
+      transformation_id: transformResult.rows[0].transformation_id,
+      source_record_id: recordId,
+      source_version: sourceRecord.source_version,
+      target_version: targetSnapshot.semantic_version,
+      transformed_data: transformedData,
+      field_mappings: fieldMappings,
+      transformed_at: transformResult.rows[0].created_at,
+      transformed_by: transformedBy,
+      note: 'This is a transformation export. The original record remains unchanged.'
+    };
+  });
+}
+
+/**
+ * Create a new student record with snapshot association
+ */
+async function createStudentRecord({
+  tenantId,
+  studentId,
+  snapshotId,
+  data,
+  createdBy
+}) {
+  // Validate that the snapshot exists and get its details
+  const snapshot = await getSchemaSnapshotById(snapshotId, tenantId);
+  
+  if (!snapshot) {
+    throw new Error(`Schema snapshot not found: ${snapshotId}`);
+  }
+  
+  // Verify schema integrity before creating record
+  const computedHash = computeSchemaHash(snapshot.schema_definition);
+  if (computedHash !== snapshot.schema_hash) {
+    throw new Error(`Schema integrity check failed for snapshot ${snapshotId}. Cannot create record.`);
+  }
+  
+  // Validate data against schema
+  for (const field of snapshot.fields) {
+    if (field.is_required && (data[field.field_name] === undefined || data[field.field_name] === null)) {
+      throw new Error(`Required field '${field.field_name}' is missing`);
+    }
+  }
+  
+  const sql = `
+    INSERT INTO student_records (
+      tenant_id,
+      student_id,
+      snapshot_id,
+      data,
+      created_by,
+      updated_by
+    )
+    VALUES ($1, $2, $3, $4, $5, $5)
+    RETURNING *
+  `;
+  
+  const result = await query(sql, [
+    tenantId,
+    studentId,
+    snapshotId,
+    data,
+    createdBy
+  ]);
+  
+  return {
+    record: result.rows[0],
+    schema_version: snapshot.semantic_version,
+    schema_version_badge: `Schema ${snapshot.semantic_version} - ${new Date(snapshot.created_at).toLocaleDateString()}`
+  };
+}
+
 module.exports = {
   FIELD_TYPES,
   VALIDATION_RULE_TYPES,
@@ -795,5 +1091,11 @@ module.exports = {
   updateSchemaStatus,
   computeSchemaHash,
   parseSemVer,
-  incrementSemVer
+  incrementSemVer,
+  // Task 2.2.5: Historic rendering functions
+  renderRecordWithSnapshot,
+  renderRecordsWithSnapshots,
+  getStudentRecordHistory,
+  transformRecordToNewSchema,
+  createStudentRecord
 };

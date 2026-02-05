@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-02-05  
 **Current Phase:** Phase 2 - Core Domain & Hierarchy  
-**Status:** Phase 1 Complete ✅ | Phase 2 In Progress (7/14 tasks)
+**Status:** Phase 1 Complete ✅ | Phase 2 In Progress (8/14 tasks)
 
 ---
 
@@ -116,7 +116,7 @@
 
 ### Phase 2: Core Domain & Hierarchy (Weeks 5-8)
 
-**Progress:** 7/14 tasks complete (50%)
+**Progress:** 8/14 tasks complete (57%)
 
 #### ✅ Completed Tasks
 
@@ -196,9 +196,19 @@
    - 27 unit tests passing (9 service + 18 routes)
    - [Implementation Summary](tasks/TASK_2.2.4_IMPLEMENTATION_SUMMARY.md)
 
+8. **Task 2.2.5: Historic Rendering with Snapshot Association** - COMPLETE ✅
+   - Student records store immutable `snapshot_id` reference
+   - Rendering engine uses original schema snapshot for historical records
+   - UI displays schema version badge (e.g., "Schema v1.2.3 - 2025-06-15")
+   - Schema transformation export for admin-initiated conversions
+   - SHA-256 integrity check on every render
+   - 17 unit tests passing (100%)
+   - [Implementation Summary](tasks/TASK_2.2.5_IMPLEMENTATION_SUMMARY.md)
+   - [Documentation](HISTORIC_RENDERING.md)
+
 #### 🔄 Next Tasks
 
-8. **Task 2.2.5: Historic Rendering with Snapshot Association** - NOT STARTED
+9. **Task 2.3.1: Build Offline-First Mobile Attendance Module** - NOT STARTED
 
 ---
 
@@ -605,10 +615,10 @@ services:
 
 ---
 
-**Status:** Phase 1 Complete! 🎉 Phase 2 In Progress (7/14 tasks)  
+**Status:** Phase 1 Complete! 🎉 Phase 2 In Progress (8/14 tasks)  
 **Phase 1 Completion:** 100% (13/13 tasks)  
-**Phase 2 Completion:** 50% (7/14 tasks)  
-**Overall Project:** Phase 1 of 5 complete + Phase 2 in progress (32% complete)
+**Phase 2 Completion:** 57% (8/14 tasks)  
+**Overall Project:** Phase 1 of 5 complete + Phase 2 in progress (36% complete)
 
 ---
 

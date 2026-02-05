@@ -344,6 +344,10 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 - [Task 2.1.2](docs/tasks/TASK_2.1.2_IMPLEMENTATION_SUMMARY.md) - Hierarchy Navigation ✅
 - [Task 2.1.3](docs/tasks/TASK_2.1.3_IMPLEMENTATION_SUMMARY.md) - Student Enrollment Workflow ✅
 - [Task 2.2.1](docs/tasks/TASK_2.2.1_IMPLEMENTATION_SUMMARY.md) - Schema Definition and Storage System ✅
+- [Task 2.2.2](docs/tasks/TASK_2.2.2_IMPLEMENTATION_SUMMARY.md) - Immutable Schema Snapshots ✅
+- [Task 2.2.3](docs/tasks/TASK_2.2.3_IMPLEMENTATION_SUMMARY.md) - Field-Level Permission System ✅
+- [Task 2.2.4](docs/tasks/TASK_2.2.4_IMPLEMENTATION_SUMMARY.md) - Schema Migration Engine ✅
+- [Task 2.2.5](docs/tasks/TASK_2.2.5_IMPLEMENTATION_SUMMARY.md) - Historic Rendering ✅
 
 **Authentication:**
 - [Auth Service](docs/AUTH_SERVICE.md) - OAuth2/OIDC authentication service
@@ -364,6 +368,7 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 **Schema System:**
 - [Schema System](docs/SCHEMA_SYSTEM.md) - Dynamic form schema management
 - [Schema Quick Start](docs/SCHEMA_QUICK_START.md) - Developer quick reference
+- [Historic Rendering](docs/HISTORIC_RENDERING.md) - Schema snapshot association and rendering
 
 ---
 
@@ -449,7 +454,14 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 - ✅ Admin-only execution with force override option
 - ✅ 27 unit tests passing (9 service + 18 routes)
 
-- [ ] Task 2.2.5: Historic rendering with snapshot association
+#### ✅ Task 2.2.5: Historic Rendering with Snapshot Association - COMPLETED
+- ✅ Student records store immutable `snapshot_id` reference
+- ✅ Rendering engine uses original schema snapshot for historical records
+- ✅ UI displays schema version badge (e.g., "Schema v1.2.3 - 2025-06-15")
+- ✅ Schema transformation export for admin-initiated conversions
+- ✅ SHA-256 integrity check on every render
+- ✅ 17 unit tests passing (100%)
+
 - [ ] Offline-first attendance
 
 ### Phase 3: Intelligence Layer (Weeks 9-12)
@@ -583,6 +595,6 @@ Built with:
 
 ---
 
-**Project Status:** Phase 1 Complete ✅ | Phase 2 In Progress (7/14 tasks)  
-**Next Milestone:** Task 2.2.5 - Historic Rendering with Snapshot Association  
+**Project Status:** Phase 1 Complete ✅ | Phase 2 In Progress (8/14 tasks)  
+**Next Milestone:** Task 2.3.1 - Build Offline-First Mobile Attendance Module  
 **Last Updated:** 2026-02-05

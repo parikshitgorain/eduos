@@ -173,7 +173,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - UI: migration wizard with step-by-step guidance
 
 
-- [ ] 2.2.5 Implement historic rendering with snapshot association
+- [x] 2.2.5 Implement historic rendering with snapshot association
   - **Definition of Done:**
     - Student records store immutable `snapshot_id` reference
     - Rendering engine uses original schema snapshot for historical records

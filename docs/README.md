@@ -295,11 +295,13 @@ All documentation should include:
 - ✅ Task 2.2.2 Summary (Immutable Schema Snapshots with SHA-256)
 - ✅ Task 2.2.3 Summary (Field-Level Permission System)
 - ✅ Task 2.2.4 Summary (Schema Migration Engine with Dry-Run Mode)
+- ✅ Task 2.2.5 Summary (Historic Rendering with Snapshot Association)
 - ✅ Security Hardening Implementation Summary
 - ✅ Security Guide
 - ✅ Security Fixes Report
 - ✅ Schema System Documentation
 - ✅ Schema Quick Start Guide
+- ✅ Historic Rendering Documentation
 - ✅ Field Permissions Documentation
 - ✅ Auth Service Documentation
 - ✅ RBAC System Documentation
