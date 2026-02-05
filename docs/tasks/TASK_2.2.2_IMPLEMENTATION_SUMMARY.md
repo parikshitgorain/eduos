@@ -201,10 +201,11 @@ npm test -- schema
 ```
 
 **Expected Results:**
-- All append-only constraint tests pass
-- All integrity verification tests pass
-- All job scheduling tests pass
-- No snapshots can be updated or deleted
+- ✅ All 17 append-only constraint tests pass
+- ✅ All integrity verification tests pass
+- ✅ All job scheduling tests pass
+- ✅ No snapshots can be updated or deleted
+- ✅ Hash verification working correctly (JavaScript and database consistent)
 
 ---
 
