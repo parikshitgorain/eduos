@@ -8,6 +8,7 @@ const request = require('supertest');
 const app = require('../server');
 const { query } = require('../config/database');
 const authService = require('../services/authService');
+const rbacService = require('../services/rbacService');
 
 describe('Authentication Routes', () => {
   let testTenantId;
@@ -386,6 +387,156 @@ describe('Authentication Routes', () => {
       expect(discovery.body.claims_supported).toContain('sub');
       expect(discovery.body.claims_supported).toContain('email');
       expect(discovery.body.claims_supported).toContain('name');
+    });
+  });
+
+  describe('GET /auth/permissions', () => {
+    beforeAll(async () => {
+      // Create default roles for the test tenant
+      await rbacService.createDefaultRoles(testTenantId);
+
+      // Get the teacher role
+      const roles = await rbacService.getTenantRoles(testTenantId);
+      const teacherRole = roles.find(r => r.roleName === 'teacher');
+
+      // Assign teacher role to test user
+      if (teacherRole) {
+        await rbacService.assignRoleToUser(testUserId, teacherRole.roleId, testTenantId, testUserId);
+      }
+    });
+
+    test('should return user permissions with valid token', async () => {
+      const response = await request(app)
+        .get('/auth/permissions')
+        .set('Authorization', `Bearer ${testAccessToken}`)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('user_id');
+      expect(response.body).toHaveProperty('tenant_id');
+      expect(response.body).toHaveProperty('roles');
+      expect(response.body).toHaveProperty('permissions');
+      expect(response.body).toHaveProperty('hierarchy');
+      expect(response.body.user_id).toBe(testUserId);
+      expect(response.body.tenant_id).toBe(testTenantId);
+      expect(Array.isArray(response.body.roles)).toBe(true);
+      expect(Array.isArray(response.body.permissions)).toBe(true);
+    });
+
+    test('should include role hierarchy information', async () => {
+      const response = await request(app)
+        .get('/auth/permissions')
+        .set('Authorization', `Bearer ${testAccessToken}`)
+        .expect(200);
+
+      expect(response.body.hierarchy).toHaveProperty('description');
+      expect(response.body.hierarchy).toHaveProperty('levels');
+      expect(response.body.hierarchy.description).toContain('SuperAdmin');
+      expect(response.body.hierarchy.description).toContain('Teacher');
+      expect(response.body.hierarchy.description).toContain('Student');
+      expect(response.body.hierarchy.levels).toHaveProperty('0', 'SuperAdmin');
+      expect(response.body.hierarchy.levels).toHaveProperty('4', 'Student');
+    });
+
+    test('should include inherited permissions from parent roles', async () => {
+      const response = await request(app)
+        .get('/auth/permissions')
+        .set('Authorization', `Bearer ${testAccessToken}`)
+        .expect(200);
+
+      // Teacher should have permissions from their role and parent roles
+      expect(response.body.permissions.length).toBeGreaterThan(0);
+    });
+
+    test('should reject request without authorization header', async () => {
+      const response = await request(app)
+        .get('/auth/permissions')
+        .expect(401);
+
+      expect(response.body.error).toBe('Unauthorized');
+      expect(response.body.message).toContain('Authorization header');
+    });
+
+    test('should reject request with invalid token', async () => {
+      const response = await request(app)
+        .get('/auth/permissions')
+        .set('Authorization', 'Bearer invalid.token.here')
+        .expect(401);
+
+      expect(response.body.error).toBe('Unauthorized');
+    });
+  });
+
+  describe('GET /auth/permissions/fields/:resourceType', () => {
+    beforeAll(async () => {
+      // Set up field permissions for the teacher role
+      const roles = await rbacService.getTenantRoles(testTenantId);
+      const teacherRole = roles.find(r => r.roleName === 'teacher');
+
+      if (teacherRole) {
+        await rbacService.setFieldPermission(
+          teacherRole.roleId,
+          testTenantId,
+          'first_name',
+          'student',
+          true,
+          true
+        );
+        await rbacService.setFieldPermission(
+          teacherRole.roleId,
+          testTenantId,
+          'email',
+          'student',
+          true,
+          false
+        );
+      }
+    });
+
+    test('should return field-level permissions for a resource type', async () => {
+      const response = await request(app)
+        .get('/auth/permissions/fields/student')
+        .set('Authorization', `Bearer ${testAccessToken}`)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('user_id');
+      expect(response.body).toHaveProperty('tenant_id');
+      expect(response.body).toHaveProperty('resource_type');
+      expect(response.body).toHaveProperty('field_permissions');
+      expect(response.body.resource_type).toBe('student');
+      expect(Array.isArray(response.body.field_permissions)).toBe(true);
+    });
+
+    test('should include read and write permissions for each field', async () => {
+      const response = await request(app)
+        .get('/auth/permissions/fields/student')
+        .set('Authorization', `Bearer ${testAccessToken}`)
+        .expect(200);
+
+      if (response.body.field_permissions.length > 0) {
+        const fieldPerm = response.body.field_permissions[0];
+        expect(fieldPerm).toHaveProperty('fieldName');
+        expect(fieldPerm).toHaveProperty('canRead');
+        expect(fieldPerm).toHaveProperty('canWrite');
+        expect(typeof fieldPerm.canRead).toBe('boolean');
+        expect(typeof fieldPerm.canWrite).toBe('boolean');
+      }
+    });
+
+    test('should reject request without authorization header', async () => {
+      const response = await request(app)
+        .get('/auth/permissions/fields/student')
+        .expect(401);
+
+      expect(response.body.error).toBe('Unauthorized');
+    });
+
+    test('should reject request with invalid token', async () => {
+      const response = await request(app)
+        .get('/auth/permissions/fields/student')
+        .set('Authorization', 'Bearer invalid.token.here')
+        .expect(401);
+
+      expect(response.body.error).toBe('Unauthorized');
     });
   });
 });

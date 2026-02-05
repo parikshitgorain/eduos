@@ -7,6 +7,7 @@
 const express = require('express');
 const router = express.Router();
 const authService = require('../services/authService');
+const rbacService = require('../services/rbacService');
 const { query } = require('../config/database');
 
 /**
@@ -372,6 +373,101 @@ router.post('/logout', async (req, res) => {
     // Even if token verification fails, return success
     res.json({
       message: 'Logged out successfully',
+    });
+  }
+});
+
+/**
+ * Get user permissions endpoint
+ * GET /auth/permissions
+ * 
+ * Returns all permissions for the authenticated user including inherited permissions
+ */
+router.get('/permissions', async (req, res) => {
+  try {
+    // Extract token from Authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Missing or invalid Authorization header',
+      });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const decoded = authService.verifyToken(token);
+
+    // Get user permissions
+    const permissions = await rbacService.getUserPermissions(decoded.sub, decoded.tenant_id);
+
+    // Get user roles
+    const roles = await rbacService.getUserRoles(decoded.sub, decoded.tenant_id);
+
+    res.json({
+      user_id: decoded.sub,
+      tenant_id: decoded.tenant_id,
+      roles: roles,
+      permissions: permissions,
+      hierarchy: {
+        description: 'SuperAdmin → InstituteAdmin → CenterAdmin → Teacher → Student',
+        levels: {
+          0: 'SuperAdmin',
+          1: 'InstituteAdmin',
+          2: 'CenterAdmin',
+          3: 'Teacher',
+          4: 'Student',
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Permissions error:', error);
+    res.status(401).json({
+      error: 'Unauthorized',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * Get field-level permissions endpoint
+ * GET /auth/permissions/fields/:resourceType
+ * 
+ * Returns field-level permissions for a specific resource type
+ */
+router.get('/permissions/fields/:resourceType', async (req, res) => {
+  try {
+    const { resourceType } = req.params;
+
+    // Extract token from Authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Missing or invalid Authorization header',
+      });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const decoded = authService.verifyToken(token);
+
+    // Get field permissions
+    const fieldPermissions = await rbacService.getUserFieldPermissions(
+      decoded.sub,
+      decoded.tenant_id,
+      resourceType
+    );
+
+    res.json({
+      user_id: decoded.sub,
+      tenant_id: decoded.tenant_id,
+      resource_type: resourceType,
+      field_permissions: fieldPermissions,
+    });
+  } catch (error) {
+    console.error('Field permissions error:', error);
+    res.status(401).json({
+      error: 'Unauthorized',
+      message: error.message,
     });
   }
 });

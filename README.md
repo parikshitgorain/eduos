@@ -72,7 +72,14 @@ EduOS is a production-grade, AI-enabled SaaS platform for educational institutio
 - ✅ Integration with Google and Microsoft SSO
 - ✅ 22 unit tests passing
 
-**Next Task:** 1.3.2 - Hierarchical RBAC
+#### ✅ Task 1.3.2: Hierarchical RBAC - COMPLETED
+- ✅ Role hierarchy: SuperAdmin → InstituteAdmin → CenterAdmin → Teacher → Student
+- ✅ Permission inheritance from parent roles
+- ✅ Field-level permissions (read/write)
+- ✅ API endpoint: GET `/auth/permissions`
+- ✅ 19 unit tests passing
+
+**Next Task:** 1.3.3 - Session Management with Redis
 
 ---
 
@@ -275,9 +282,12 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 - [Task 1.2.2](docs/tasks/TASK_1.2.2_IMPLEMENTATION_SUMMARY.md) - Domain Verification ✅
 - [Task 1.2.3](docs/tasks/TASK_1.2.3_IMPLEMENTATION_SUMMARY.md) - Cache Layer ✅
 - [Task 1.3.1](docs/tasks/TASK_1.3.1_IMPLEMENTATION_SUMMARY.md) - OAuth2/OIDC Authentication ✅
+- [Task 1.3.2](docs/tasks/TASK_1.3.2_IMPLEMENTATION_SUMMARY.md) - Hierarchical RBAC ✅
 
 **Authentication:**
 - [Auth Service](docs/AUTH_SERVICE.md) - OAuth2/OIDC authentication service
+- [RBAC System](docs/RBAC_SYSTEM.md) - Hierarchical role-based access control
+- [RBAC Quick Reference](docs/RBAC_QUICK_REFERENCE.md) - Quick reference guide
 
 **Domain & Caching:**
 - [Domain Mapping](docs/DOMAIN_MAPPING.md) - Custom domain resolution
@@ -297,7 +307,7 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 - [x] Task 1.2.2: Domain verification workflow ✅
 - [x] Task 1.2.3: Tenant routing cache ✅
 - [x] Task 1.3.1: OAuth2/OIDC authentication ✅
-- [ ] Task 1.3.2: Hierarchical RBAC
+- [x] Task 1.3.2: Hierarchical RBAC ✅
 - [ ] Task 1.3.3: Session management
 - [ ] Task 1.3.4: Multi-factor authentication
 
@@ -438,6 +448,6 @@ Built with:
 
 ---
 
-**Project Status:** Phase 1 - Task 1.3.1 Complete ✅  
-**Next Milestone:** Task 1.3.2 - Hierarchical RBAC  
+**Project Status:** Phase 1 - Task 1.3.2 Complete ✅  
+**Next Milestone:** Task 1.3.3 - Session Management with Redis  
 **Last Updated:** 2026-02-05

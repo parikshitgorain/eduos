@@ -80,7 +80,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - Token expiry: 1 hour (access), 7 days (refresh)
     - Integration with at least one SSO provider (Google/Microsoft)
 
-- [ ] 1.3.2 Implement hierarchical role-based access control (RBAC)
+- [x] 1.3.2 Implement hierarchical role-based access control (RBAC)
   - **Definition of Done:**
     - Role hierarchy: SuperAdmin → InstituteAdmin → CenterAdmin → Teacher → Student
     - Roles stored with `tenant_id` and hierarchy level
