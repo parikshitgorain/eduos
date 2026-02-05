@@ -54,9 +54,30 @@ const VALIDATION_RULE_TYPES = [
  * Compute SHA-256 hash of schema definition
  */
 function computeSchemaHash(schemaDefinition) {
-  // Convert to canonical JSON string (sorted keys)
-  const canonicalJson = JSON.stringify(schemaDefinition, Object.keys(schemaDefinition).sort());
+  // Convert to canonical JSON string with sorted keys at all levels
+  // This matches PostgreSQL's JSONB canonical representation
+  const canonicalJson = JSON.stringify(sortKeysRecursive(schemaDefinition));
   return crypto.createHash('sha256').update(canonicalJson).digest('hex');
+}
+
+/**
+ * Recursively sort object keys to match PostgreSQL JSONB canonical form
+ */
+function sortKeysRecursive(obj) {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(sortKeysRecursive);
+  }
+  
+  const sorted = {};
+  Object.keys(obj).sort().forEach(key => {
+    sorted[key] = sortKeysRecursive(obj[key]);
+  });
+  
+  return sorted;
 }
 
 /**
@@ -465,29 +486,34 @@ async function getSchemaVersionHistory(tenantId, formType) {
  * Verify schema integrity
  */
 async function verifySchemaIntegrity(snapshotId, tenantId) {
+  // Get the snapshot data
   const sql = `
-    SELECT * FROM verify_schema_integrity($1)
+    SELECT schema_hash, schema_definition, semantic_version, created_at
+    FROM schema_snapshots
+    WHERE snapshot_id = $1 AND tenant_id = $2
   `;
   
-  const result = await query(sql, [snapshotId]);
+  const result = await query(sql, [snapshotId, tenantId]);
   
   if (result.rows.length === 0) {
-    throw new Error(`Schema snapshot not found: ${snapshotId}`);
-  }
-  
-  const verification = result.rows[0];
-  
-  // Filter by tenant_id for security
-  const snapshotCheck = await query(
-    'SELECT tenant_id FROM schema_snapshots WHERE snapshot_id = $1',
-    [snapshotId]
-  );
-  
-  if (snapshotCheck.rows.length === 0 || snapshotCheck.rows[0].tenant_id !== tenantId) {
     throw new Error(`Schema snapshot not found or access denied: ${snapshotId}`);
   }
   
-  return verification;
+  const snapshot = result.rows[0];
+  
+  // Compute hash using the same method as when it was created
+  const computedHash = computeSchemaHash(snapshot.schema_definition);
+  const isValid = snapshot.schema_hash === computedHash;
+  
+  return {
+    is_valid: isValid,
+    stored_hash: snapshot.schema_hash,
+    computed_hash: computedHash,
+    snapshot_id: snapshotId,
+    semantic_version: snapshot.semantic_version,
+    created_at: snapshot.created_at,
+    verification_timestamp: new Date()
+  };
 }
 
 /**

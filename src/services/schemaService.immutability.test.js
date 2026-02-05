@@ -14,10 +14,11 @@ describe('Schema Immutability (Task 2.2.2)', () => {
   let testSnapshotId;
   
   beforeAll(async () => {
-    // Create test tenant
+    // Create test tenant with unique subdomain
+    const uniqueId = Date.now();
     const tenantResult = await query(`
       INSERT INTO tenants (name, subdomain, tier)
-      VALUES ('Test Immutability Tenant', 'test-immutability', 'Business')
+      VALUES ('Test Immutability Tenant', 'test-immutability-${uniqueId}', 'Business')
       RETURNING tenant_id
     `);
     testTenantId = tenantResult.rows[0].tenant_id;
