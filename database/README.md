@@ -41,10 +41,24 @@ psql -U eduos_app -d eduos_db -f tests/rls_isolation.test.sql
 ```
 database/
 ├── README.md                           # This file
-├── setup.sh                            # Automated setup script
+├── QUICK_REFERENCE.md                  # Quick reference guide
+├── setup.sh                            # Automated setup script (Unix)
+├── validate.sh                         # Validation script (Unix)
+├── validate.ps1                        # Validation script (Windows)
+├── migrate.js                          # Migration runner (Node.js)
 ├── migrations/                         # Database migrations
-│   ├── 001_setup_rls_foundation.sql   # Initial RLS setup
-│   └── 001_setup_rls_foundation_rollback.sql  # Rollback script
+│   ├── 001_setup_rls_foundation.sql           # Initial RLS setup ✅
+│   ├── 001_setup_rls_foundation_rollback.sql  # Rollback script
+│   ├── 002_tenant_provisioning.sql            # Tenant management ✅
+│   ├── 003_custom_domain_mapping.sql          # Domain mapping ✅
+│   ├── 004_notifications_table.sql            # Notifications ✅
+│   ├── 005_auth_service.sql                   # Authentication ✅
+│   ├── 005_auth_service_rollback.sql          # Auth rollback
+│   ├── 006_rbac_hierarchy.sql                 # RBAC system ✅
+│   ├── 006_rbac_hierarchy_rollback.sql        # RBAC rollback
+│   ├── 007_mfa_support.sql                    # MFA support ✅
+│   ├── 007_mfa_support_rollback.sql           # MFA rollback
+│   └── 008_hierarchy_entities.sql             # Organizational hierarchy ✅
 ├── tests/                              # Test suites
 │   └── rls_isolation.test.sql         # RLS isolation tests
 └── docs/                               # Documentation
@@ -53,21 +67,127 @@ database/
 
 ## What Gets Created
 
-### Tables
+### Phase 1: SaaS Foundation (Tasks 1.1.1 - 1.3.4) ✅
 
-1. **tenants** - Multi-tenant configuration
-2. **students** - Student identity and profiles
-3. **enrollments** - Student enrollment records
-4. **attendance** - Attendance tracking
-5. **payments** - Financial transactions
+#### Core Tables
+
+1. **tenants** - Multi-tenant configuration (Task 1.1.3)
+   - Tenant management with tier-based quotas
+   - Subdomain and custom domain support
+   - Resource limits and status tracking
+
+2. **students** - Student identity and profiles (Task 1.1.1)
+   - Canonical student records with RLS
+   - UUID-based identity
+   - Tenant isolation enforced
+
+3. **enrollments** - Student enrollment records (Task 1.1.1)
+   - Batch enrollment tracking
+   - Status and date management
+   - RLS-protected
+
+4. **attendance** - Attendance tracking (Task 1.1.1)
+   - Event-based attendance records
+   - Offline sync support
+   - RLS-protected
+
+5. **payments** - Financial transactions (Task 1.1.1)
+   - Payment processing with idempotency
+   - Invoice generation
+   - RLS-protected
+
+#### Domain & Caching (Tasks 1.2.1 - 1.2.3)
+
+6. **tenant_domains** - Custom domain mapping
+   - Domain-to-tenant resolution
+   - DNS verification tracking
+   - SSL certificate status
+
+7. **domain_verification_tokens** - DNS verification
+   - TXT record tokens
+   - Verification status tracking
+   - Expiration management
+
+#### Authentication & Authorization (Tasks 1.3.1 - 1.3.4)
+
+8. **users** - User accounts
+   - OAuth2/OIDC integration
+   - Email and profile management
+   - Tenant association
+
+9. **roles** - Hierarchical roles
+   - SuperAdmin → InstituteAdmin → CenterAdmin → Teacher → Student
+   - Permission inheritance
+   - Tenant-scoped roles
+
+10. **permissions** - Granular permissions
+    - Resource-based access control
+    - Field-level permissions
+    - Action-based (read, write, delete)
+
+11. **user_roles** - User-role assignments
+    - Many-to-many relationship
+    - Tenant-scoped assignments
+    - Effective date tracking
+
+12. **sessions** - Session management
+    - Redis-backed session storage
+    - Concurrent session limits
+    - Activity tracking
+
+13. **mfa_secrets** - Multi-factor authentication
+    - TOTP secrets (encrypted)
+    - Backup codes (hashed)
+    - Recovery options
+
+14. **mfa_backup_codes** - MFA backup codes
+    - Single-use codes
+    - SHA-256 hashed
+    - Usage tracking
+
+### Phase 2: Core Domain & Hierarchy (Tasks 2.1.1 - 2.1.2) ✅
+
+#### Organizational Hierarchy (Task 2.1.1)
+
+15. **institutes** - Top-level institutions
+    - Root of hierarchy tree
+    - Tenant-scoped
+    - RLS-protected
+
+16. **centers** - Centers within institutes
+    - Second level of hierarchy
+    - Parent: Institute
+    - RLS-protected
+
+17. **programs** - Academic programs
+    - Third level of hierarchy
+    - Parent: Center
+    - Duration tracking
+
+18. **batches** - Student batches/classes
+    - Fourth level (leaf nodes)
+    - Parent: Program
+    - Capacity and date management
 
 ### Security Features
 
-- ✅ Row-Level Security (RLS) enabled on all core tables
-- ✅ Tenant isolation policies enforced at database level
-- ✅ Composite foreign keys prevent cross-tenant references
-- ✅ Indexes optimized for tenant-scoped queries
-- ✅ Audit triggers for timestamp tracking
+- ✅ Row-Level Security (RLS) enabled on all core tables (Task 1.1.1)
+- ✅ Tenant isolation policies enforced at database level (Task 1.1.1)
+- ✅ Composite foreign keys prevent cross-tenant references (Task 1.1.1)
+- ✅ Indexes optimized for tenant-scoped queries (Task 1.1.1)
+- ✅ Audit triggers for timestamp tracking (Task 1.1.1)
+- ✅ Hierarchical RBAC with permission inheritance (Task 1.3.2)
+- ✅ Encrypted MFA secrets (AES-256) (Task 1.3.4)
+- ✅ Hashed backup codes (SHA-256) (Task 1.3.4)
+- ✅ Cascade delete protection on hierarchy (Task 2.1.1)
+- ✅ Circular reference prevention (Task 2.1.1)
+
+### Database Functions
+
+- `count_hierarchy_children()` - Count children at each hierarchy level (Task 2.1.1)
+- `check_circular_reference()` - Prevent circular references in hierarchy (Task 2.1.1)
+- `get_user_permissions()` - Resolve user permissions with role inheritance (Task 1.3.2)
+- `check_role_hierarchy()` - Validate role hierarchy constraints (Task 1.3.2)
 
 ### Extensions
 
