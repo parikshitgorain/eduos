@@ -20,4 +20,6 @@ module.exports = {
     '^openid-client$': '<rootDir>/src/__mocks__/openid-client.js',
   },
   testTimeout: 10000,
+  // Setup file to suppress console output during tests
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
 };
