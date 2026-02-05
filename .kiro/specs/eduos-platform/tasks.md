@@ -128,7 +128,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - UI component: tree view for hierarchy navigation
     - Performance: hierarchy queries < 50ms for 10,000 nodes
 
-- [ ] 2.1.3 Create student enrollment workflow
+- [x] 2.1.3 Create student enrollment workflow
   - **Definition of Done:**
     - Students can be enrolled in multiple batches
     - Enrollment includes: start_date, end_date, status (active/inactive/graduated)

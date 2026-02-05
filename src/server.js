@@ -86,6 +86,10 @@ app.use('/api', tenantContext);
 
 // Protected API routes (require tenant context)
 app.use('/api/v1/domains', domainRoutes);
+
+// Enrollment management routes (require tenant context)
+const enrollmentRoutes = require('./routes/enrollments');
+app.use('/api/v1/enrollments', enrollmentRoutes);
 app.get('/api/students', async (req, res) => {
   // RLS automatically filters by tenant_id
   const result = await req.dbClient.query(
