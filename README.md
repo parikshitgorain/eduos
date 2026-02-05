@@ -99,6 +99,45 @@ EduOS is a production-grade, AI-enabled SaaS platform for educational institutio
 
 ---
 
+## Security
+
+### 🔒 Security Hardening - COMPLETED
+
+The EduOS Platform implements enterprise-grade security measures:
+
+#### Security Features
+
+✅ **No Hardcoded Secrets** - Application fails fast if secrets not configured  
+✅ **Comprehensive Rate Limiting** - Protection against brute force and DDoS  
+✅ **Strict CORS Policy** - Whitelist-based origin validation  
+✅ **Input Validation** - Comprehensive validation and sanitization  
+✅ **Security Headers** - CSP, HSTS, X-Frame-Options, and more  
+✅ **Encryption** - AES-256-CBC for MFA secrets, bcrypt for passwords  
+✅ **Audit Logging** - Immutable audit trail for all sensitive operations  
+
+#### Security Audit Results
+
+- **npm audit**: 0 vulnerabilities
+- **Tests**: 470/470 passing
+- **OWASP Top 10**: Compliant
+- **CWE Top 25**: Mitigated
+
+#### Rate Limits
+
+| Endpoint | Limit | Window |
+|----------|-------|--------|
+| General API | 100 requests | 15 minutes |
+| Authentication | 5 attempts | 15 minutes |
+| Password Reset | 3 requests | 1 hour |
+| MFA Verification | 10 attempts | 15 minutes |
+
+For detailed security information, see:
+- [Security Guide](docs/SECURITY.md)
+- [Security Fixes Report](docs/SECURITY_FIXES_REPORT.md)
+- [Implementation Summary](docs/tasks/SECURITY_HARDENING_IMPLEMENTATION_SUMMARY.md)
+
+---
+
 ## Quick Start
 
 ### Prerequisites

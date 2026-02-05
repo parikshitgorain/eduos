@@ -150,8 +150,17 @@ eduos-platform/
 | [Task 2.1.3](tasks/TASK_2.1.3_IMPLEMENTATION_SUMMARY.md) | Student Enrollment Workflow | ✅ Complete |
 | [Task 2.2.1](tasks/TASK_2.2.1_IMPLEMENTATION_SUMMARY.md) | Schema Definition and Storage System | ✅ Complete |
 | [Task 2.2.2](tasks/TASK_2.2.2_IMPLEMENTATION_SUMMARY.md) | Immutable Schema Snapshots with SHA-256 | ✅ Complete |
+| [Security Hardening](tasks/SECURITY_HARDENING_IMPLEMENTATION_SUMMARY.md) | Comprehensive Security Fixes | ✅ Complete |
 
-### 6. Utility Scripts
+### 6. Security Documentation
+
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [Security Guide](SECURITY.md) | Comprehensive security guide | All |
+| [Security Fixes Report](SECURITY_FIXES_REPORT.md) | Detailed vulnerability report | Developers |
+| [Security Implementation](tasks/SECURITY_HARDENING_IMPLEMENTATION_SUMMARY.md) | Implementation summary | Developers |
+
+### 7. Utility Scripts
 
 | Script | Description | Usage |
 |--------|-------------|-------|
@@ -282,6 +291,9 @@ All documentation should include:
 - ✅ Task 2.1.3 Summary (Student Enrollment Workflow)
 - ✅ Task 2.2.1 Summary (Schema Definition and Storage System)
 - ✅ Task 2.2.2 Summary (Immutable Schema Snapshots with SHA-256)
+- ✅ Security Hardening Implementation Summary
+- ✅ Security Guide
+- ✅ Security Fixes Report
 - ✅ Schema System Documentation
 - ✅ Schema Quick Start Guide
 - ✅ Auth Service Documentation
@@ -302,7 +314,6 @@ All documentation should include:
 
 - ⏸️ Deployment Guide
 - ⏸️ Monitoring Guide
-- ⏸️ Security Best Practices
 
 ---
 
