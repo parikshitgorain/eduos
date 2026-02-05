@@ -8,6 +8,7 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { Issuer, generators } = require('openid-client');
+const sessionService = require('./sessionService');
 
 class AuthService {
   constructor() {
@@ -379,6 +380,68 @@ class AuthService {
         },
       ],
     };
+  }
+
+  /**
+   * Create session after successful authentication
+   * @param {Object} userData - User data
+   * @param {Object} metadata - Session metadata (IP, user agent, etc.)
+   * @returns {Promise<Object>} Session object
+   */
+  async createAuthSession(userData, metadata = {}) {
+    const {
+      userId,
+      tenantId,
+      email,
+      roles = [],
+      permissions = [],
+      tier = 'basic',
+    } = userData;
+
+    return await sessionService.createSession({
+      userId,
+      tenantId,
+      email,
+      roles,
+      permissions,
+      tier,
+      metadata,
+    });
+  }
+
+  /**
+   * Logout user by revoking session
+   * @param {string} sessionId - Session ID
+   * @returns {Promise<boolean>} True if session was revoked
+   */
+  async logout(sessionId) {
+    return await sessionService.revokeSession(sessionId, 'user_logout');
+  }
+
+  /**
+   * Logout user from all devices
+   * @param {string} userId - User ID
+   * @param {string} tenantId - Tenant ID
+   * @returns {Promise<number>} Number of sessions revoked
+   */
+  async logoutAll(userId, tenantId) {
+    return await sessionService.revokeAllUserSessions(userId, tenantId, 'user_logout_all');
+  }
+
+  /**
+   * Validate session and refresh if needed
+   * @param {string} sessionId - Session ID
+   * @returns {Promise<Object|null>} Session object or null if invalid
+   */
+  async validateSession(sessionId) {
+    const session = await sessionService.getSession(sessionId);
+    
+    if (!session) {
+      return null;
+    }
+
+    // Touch session to update sliding expiration
+    return await sessionService.touchSession(sessionId);
   }
 }
 
