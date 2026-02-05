@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Domain Not Found - EduOS Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 60px 40px;
+            text-align: center;
+        }
+        
+        .error-code {
+            font-size: 120px;
+            font-weight: 700;
+            color: #667eea;
+            line-height: 1;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 32px;
+            color: #2d3748;
+            margin-bottom: 16px;
+        }
+        
+        .domain {
+            font-family: 'Courier New', monospace;
+            background: #f7fafc;
+            padding: 12px 20px;
+            border-radius: 6px;
+            color: #667eea;
+            font-weight: 600;
+            margin: 24px 0;
+            word-break: break-all;
+        }
+        
+        p {
+            color: #4a5568;
+            font-size: 18px;
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 14px 28px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #2d3748;
+        }
+        
+        .btn-secondary:hover {
+            background: #cbd5e0;
+            transform: translateY(-2px);
+        }
+        
+        .info-box {
+            background: #edf2f7;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin-top: 32px;
+            text-align: left;
+            border-radius: 4px;
+        }
+        
+        .info-box h3 {
+            color: #2d3748;
+            font-size: 18px;
+            margin-bottom: 12px;
+        }
+        
+        .info-box ul {
+            list-style: none;
+            color: #4a5568;
+            font-size: 15px;
+            line-height: 1.8;
+        }
+        
+        .info-box li:before {
+            content: "→";
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        
+        @media (max-width: 640px) {
+            .container {
+                padding: 40px 24px;
+            }
+            
+            .error-code {
+                font-size: 80px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+            
+            p {
+                font-size: 16px;
+            }
+            
+            .actions {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="error-code">404</div>
+        <h1>Domain Not Found</h1>
+        
+        <div class="domain">{{domain}}</div>
+        
+        <p>This domain is not registered with the EduOS Platform. Please check the URL and try again.</p>
+        
+        <div class="actions">
+            <a href="https://eduos.com" class="btn btn-primary">Go to EduOS Home</a>
+            <a href="mailto:support@eduos.com" class="btn btn-secondary">Contact Support</a>
+        </div>
+        
+        <div class="info-box">
+            <h3>Are you a tenant administrator?</h3>
+            <ul>
+                <li>Verify your custom domain is correctly configured</li>
+                <li>Check DNS records are pointing to EduOS servers</li>
+                <li>Ensure domain verification is complete</li>
+                <li>Contact support if you need assistance</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
