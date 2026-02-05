@@ -77,6 +77,10 @@ app.use('/auth', authRoutes);
 // Domain management routes (require tenant context)
 const domainRoutes = require('./routes/domains');
 
+// Hierarchy management routes (NO tenant context middleware - has its own)
+const hierarchyRoutes = require('./routes/hierarchy');
+app.use('/api/v1/hierarchy', hierarchyRoutes);
+
 // Apply tenant context middleware to all /api routes
 app.use('/api', tenantContext);
 

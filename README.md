@@ -301,6 +301,7 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 - [Task 1.3.2](docs/tasks/TASK_1.3.2_IMPLEMENTATION_SUMMARY.md) - Hierarchical RBAC ✅
 - [Task 1.3.3](docs/tasks/TASK_1.3.3_IMPLEMENTATION_SUMMARY.md) - Session Management ✅
 - [Task 1.3.4](docs/tasks/TASK_1.3.4_IMPLEMENTATION_SUMMARY.md) - Multi-Factor Authentication ✅
+- [Task 2.1.1](docs/tasks/TASK_2.1.1_IMPLEMENTATION_SUMMARY.md) - Hierarchical Entity Tree ✅
 
 **Authentication:**
 - [Auth Service](docs/AUTH_SERVICE.md) - OAuth2/OIDC authentication service
@@ -336,7 +337,15 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 
 ### Phase 2: Core Domain & Hierarchy (Weeks 5-8)
 
-- [ ] Organizational structure (Institute → Center → Program → Batch)
+#### ✅ Task 2.1.1: Hierarchical Entity Tree - COMPLETED
+- ✅ Institute → Center → Program → Batch hierarchy
+- ✅ Database schema with RLS policies
+- ✅ Cascade delete protection
+- ✅ CRUD API endpoints for all levels
+- ✅ 35 unit tests passing
+
+- [ ] Task 2.1.2: Hierarchy navigation and permission inheritance
+- [ ] Task 2.1.3: Student enrollment workflow
 - [ ] Dynamic forms with schema engine
 - [ ] Offline-first attendance
 
@@ -471,6 +480,6 @@ Built with:
 
 ---
 
-**Project Status:** Phase 1 Complete ✅ (All 13 tasks finished!)  
-**Next Milestone:** Phase 2 - Core Domain & Hierarchy  
+**Project Status:** Phase 1 Complete ✅ | Phase 2 Started (1/14 tasks)  
+**Next Milestone:** Task 2.1.2 - Hierarchy Navigation  
 **Last Updated:** 2026-02-05

@@ -111,7 +111,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
 
 ### 2.1 Organizational Structure
 
-- [ ] 2.1.1 Implement Institute → Center → Program → Batch entity tree
+- [x] 2.1.1 Implement Institute → Center → Program → Batch entity tree
   - **Definition of Done:**
     - Database schema with hierarchical relationships
     - Each entity has: id, tenant_id, parent_id, name, metadata

@@ -1,8 +1,8 @@
 # EduOS Platform - Project Status
 
 **Last Updated:** 2026-02-05  
-**Current Phase:** Phase 1 - SaaS Foundation  
-**Status:** Phase 1 Complete ✅ (13/13 tasks)
+**Current Phase:** Phase 2 - Core Domain & Hierarchy  
+**Status:** Phase 1 Complete ✅ | Phase 2 Started (1/14 tasks)
 
 ---
 
@@ -114,19 +114,49 @@
 
 ---
 
+### Phase 2: Core Domain & Hierarchy (Weeks 5-8)
+
+**Progress:** 1/14 tasks complete (7%)
+
+#### ✅ Completed Tasks
+
+##### 2.1 Organizational Structure
+
+1. **Task 2.1.1: Hierarchical Entity Tree** - COMPLETE ✅
+   - Institute → Center → Program → Batch hierarchy
+   - Database schema with RLS policies
+   - Cascade delete protection (ON DELETE RESTRICT)
+   - CRUD API endpoints for all hierarchy levels
+   - 35 unit tests passing
+   - [Implementation Summary](tasks/TASK_2.1.1_IMPLEMENTATION_SUMMARY.md)
+
+#### 🔄 Next Tasks
+
+2. **Task 2.1.2: Hierarchy Navigation** - NOT STARTED
+   - Hierarchy navigation API
+   - Permission inheritance logic
+   - Tree view UI component
+
+3. **Task 2.1.3: Student Enrollment Workflow** - NOT STARTED
+   - Student enrollment in batches
+   - Enrollment history tracking
+   - Bulk enrollment API
+
+---
+
 ## 🎯 Current Milestone
 
 **Milestone:** Phase 1 Complete ✅  
 **Status:** 13/13 tasks complete (100%) 🎉
 
 **Next Milestone:** Phase 2 - Core Domain & Hierarchy  
-**Status:** Not started
+**Status:** 1/14 tasks complete (7%)
 
 ---
 
 ## 📈 Test Coverage
 
-**Total Tests:** 311+ passing ✅
+**Total Tests:** 346+ passing ✅
 
 ### By Component
 
@@ -144,6 +174,7 @@
 | Session Routes | 18 | 100% | ✅ |
 | MFA Service | 24 | 90% | ✅ |
 | MFA Routes | 22 | 100% | ✅ |
+| Hierarchy Routes | 35 | 74% | ✅ |
 
 ---
 
@@ -157,6 +188,7 @@
 5. ✅ `005_auth_service.sql` - Authentication service tables
 6. ✅ `006_rbac_hierarchy.sql` - Hierarchical RBAC system
 7. ✅ `007_mfa_support.sql` - Multi-factor authentication tables
+8. ✅ `008_hierarchy_entities.sql` - Organizational hierarchy (Institute → Center → Program → Batch)
 
 **Database Health:** ✅ All migrations applied successfully
 
@@ -233,6 +265,31 @@
 | POST | `/api/v1/mfa/policy` | ✅ Working | [MFA System](MFA_SYSTEM.md) |
 | GET | `/api/v1/mfa/policy/:tenantId` | ✅ Working | [MFA System](MFA_SYSTEM.md) |
 
+### Hierarchy Management (NEW)
+
+| Method | Endpoint | Status | Documentation |
+|--------|----------|--------|---------------|
+| POST | `/api/v1/hierarchy/institutes` | ✅ Working | Task 2.1.1 Summary |
+| GET | `/api/v1/hierarchy/institutes` | ✅ Working | Task 2.1.1 Summary |
+| GET | `/api/v1/hierarchy/institutes/:id` | ✅ Working | Task 2.1.1 Summary |
+| PATCH | `/api/v1/hierarchy/institutes/:id` | ✅ Working | Task 2.1.1 Summary |
+| DELETE | `/api/v1/hierarchy/institutes/:id` | ✅ Working | Task 2.1.1 Summary |
+| POST | `/api/v1/hierarchy/centers` | ✅ Working | Task 2.1.1 Summary |
+| GET | `/api/v1/hierarchy/centers` | ✅ Working | Task 2.1.1 Summary |
+| GET | `/api/v1/hierarchy/centers/:id` | ✅ Working | Task 2.1.1 Summary |
+| PATCH | `/api/v1/hierarchy/centers/:id` | ✅ Working | Task 2.1.1 Summary |
+| DELETE | `/api/v1/hierarchy/centers/:id` | ✅ Working | Task 2.1.1 Summary |
+| POST | `/api/v1/hierarchy/programs` | ✅ Working | Task 2.1.1 Summary |
+| GET | `/api/v1/hierarchy/programs` | ✅ Working | Task 2.1.1 Summary |
+| GET | `/api/v1/hierarchy/programs/:id` | ✅ Working | Task 2.1.1 Summary |
+| PATCH | `/api/v1/hierarchy/programs/:id` | ✅ Working | Task 2.1.1 Summary |
+| DELETE | `/api/v1/hierarchy/programs/:id` | ✅ Working | Task 2.1.1 Summary |
+| POST | `/api/v1/hierarchy/batches` | ✅ Working | Task 2.1.1 Summary |
+| GET | `/api/v1/hierarchy/batches` | ✅ Working | Task 2.1.1 Summary |
+| GET | `/api/v1/hierarchy/batches/:id` | ✅ Working | Task 2.1.1 Summary |
+| PATCH | `/api/v1/hierarchy/batches/:id` | ✅ Working | Task 2.1.1 Summary |
+| DELETE | `/api/v1/hierarchy/batches/:id` | ✅ Working | Task 2.1.1 Summary |
+
 ---
 
 ## 🏗️ Infrastructure
@@ -306,6 +363,7 @@ services:
 - ✅ Task 1.3.2 Summary
 - ✅ Task 1.3.3 Summary
 - ✅ Task 1.3.4 Summary
+- ✅ Task 2.1.1 Summary
 - ✅ Auth Service Documentation
 - ✅ RBAC System Documentation
 - ✅ RBAC Quick Reference
@@ -354,9 +412,10 @@ services:
 ### Short Term (Next 2 Weeks)
 
 1. ✅ Phase 1 Complete!
-2. Begin Phase 2 - Core Domain & Hierarchy
-3. Implement organizational structure (Task 2.1.1)
+2. ✅ Begin Phase 2 - Core Domain & Hierarchy
+3. ✅ Implement organizational structure (Task 2.1.1)
 4. Build hierarchy navigation (Task 2.1.2)
+5. Create student enrollment workflow (Task 2.1.3)
 
 ### Medium Term (Next Month)
 
@@ -397,9 +456,17 @@ services:
 - ✅ Hierarchical RBAC system complete
 - ✅ Session management with Redis complete
 - ✅ Multi-factor authentication complete
-- ✅ 311+ tests passing
+- ✅ 346+ tests passing
 - ✅ Comprehensive documentation
 - ✅ Production-ready infrastructure
+
+### Phase 2 Progress
+
+- ✅ 1/14 tasks complete (7%)
+- ✅ Hierarchical entity tree implemented
+- ✅ Institute → Center → Program → Batch structure
+- ✅ Cascade delete protection
+- ✅ 35 hierarchy tests passing
 
 ### Key Milestones
 
@@ -412,12 +479,14 @@ services:
 - ✅ TOTP-based MFA with backup codes
 - ✅ Background jobs for automation
 - ✅ Comprehensive test coverage
+- ✅ Hierarchical organizational structure (Institute → Center → Program → Batch)
 
 ---
 
-**Status:** Phase 1 Complete! 🎉 Ready for Phase 2  
+**Status:** Phase 1 Complete! 🎉 Phase 2 Started (1/14 tasks)  
 **Phase 1 Completion:** 100% (13/13 tasks)  
-**Overall Project:** Phase 1 of 5 (20% complete)
+**Phase 2 Completion:** 7% (1/14 tasks)  
+**Overall Project:** Phase 1 of 5 complete + Phase 2 started (22% complete)
 
 ---
 
