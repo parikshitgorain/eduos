@@ -483,6 +483,42 @@ async function getSchemaVersionHistory(tenantId, formType) {
 }
 
 /**
+ * Verify schema integrity (system-level, bypasses tenant check)
+ * Used by integrity check jobs that need to verify all snapshots
+ */
+async function verifySchemaIntegritySystem(snapshotId) {
+  // Get the snapshot data without tenant check
+  const sql = `
+    SELECT snapshot_id, schema_hash, schema_definition, semantic_version, created_at, tenant_id
+    FROM schema_snapshots
+    WHERE snapshot_id = $1
+  `;
+  
+  const result = await query(sql, [snapshotId]);
+  
+  if (result.rows.length === 0) {
+    throw new Error(`Schema snapshot not found: ${snapshotId}`);
+  }
+  
+  const snapshot = result.rows[0];
+  
+  // Compute hash using the same method as when it was created
+  const computedHash = computeSchemaHash(snapshot.schema_definition);
+  const isValid = snapshot.schema_hash === computedHash;
+  
+  return {
+    is_valid: isValid,
+    stored_hash: snapshot.schema_hash,
+    computed_hash: computedHash,
+    snapshot_id: snapshotId,
+    tenant_id: snapshot.tenant_id,
+    semantic_version: snapshot.semantic_version,
+    created_at: snapshot.created_at,
+    verification_timestamp: new Date()
+  };
+}
+
+/**
  * Verify schema integrity
  */
 async function verifySchemaIntegrity(snapshotId, tenantId) {
@@ -752,6 +788,7 @@ module.exports = {
   listSchemaSnapshots,
   getSchemaVersionHistory,
   verifySchemaIntegrity,
+  verifySchemaIntegritySystem,
   verifyAllSnapshotsForTenant,
   exportSchema,
   importSchema,

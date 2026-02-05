@@ -15,6 +15,7 @@
 
 const { query } = require('../config/database');
 const cron = require('node-cron');
+const schemaService = require('../services/schemaService');
 
 /**
  * Run integrity check on all schema snapshots
@@ -25,36 +26,97 @@ async function runIntegrityCheck() {
   try {
     console.log('[Schema Integrity Check] Starting integrity verification...');
     
-    // Call the database function to verify all snapshots
-    const result = await query('SELECT * FROM verify_all_schema_integrity()');
+    // Get all schema snapshots
+    const snapshotsResult = await query(`
+      SELECT snapshot_id
+      FROM schema_snapshots
+      ORDER BY created_at ASC
+    `);
     
-    if (result.rows.length === 0) {
-      throw new Error('Integrity check function returned no results');
+    const snapshots = snapshotsResult.rows;
+    let totalChecked = 0;
+    let failedCount = 0;
+    const failedSnapshots = [];
+    
+    // Create check record
+    const checkResult = await query(`
+      INSERT INTO schema_integrity_checks (check_started_at, check_status)
+      VALUES (NOW(), 'running')
+      RETURNING check_id
+    `);
+    const checkId = checkResult.rows[0].check_id;
+    
+    // Verify each snapshot using JavaScript hash computation (system-level)
+    for (const snapshot of snapshots) {
+      totalChecked++;
+      
+      try {
+        const verification = await schemaService.verifySchemaIntegritySystem(
+          snapshot.snapshot_id
+        );
+        
+        if (!verification.is_valid) {
+          failedCount++;
+          failedSnapshots.push(snapshot.snapshot_id);
+        }
+      } catch (error) {
+        // If verification fails, count as failed
+        failedCount++;
+        failedSnapshots.push(snapshot.snapshot_id);
+        console.error(`Failed to verify snapshot ${snapshot.snapshot_id}:`, error.message);
+      }
     }
     
-    const checkResult = result.rows[0];
     const duration = Date.now() - startTime;
     
-    console.log('[Schema Integrity Check] Completed in', duration, 'ms');
-    console.log('  - Total snapshots checked:', checkResult.total_checked);
-    console.log('  - Failed snapshots:', checkResult.failed_count);
+    // Update check record
+    await query(`
+      UPDATE schema_integrity_checks
+      SET 
+        check_completed_at = NOW(),
+        total_snapshots_checked = $1,
+        failed_snapshots = $2,
+        failed_snapshot_ids = $3,
+        check_status = $4,
+        metadata = jsonb_build_object(
+          'duration_ms', $5::integer,
+          'success_rate', CASE WHEN $1 > 0 THEN (($1 - $2)::float / $1 * 100) ELSE 100 END
+        )
+      WHERE check_id = $6
+    `, [
+      totalChecked,
+      failedCount,
+      failedSnapshots,
+      failedCount > 0 ? 'failed' : 'completed',
+      duration,
+      checkId
+    ]);
     
-    if (checkResult.failed_count > 0) {
+    console.log('[Schema Integrity Check] Completed in', duration, 'ms');
+    console.log('  - Total snapshots checked:', totalChecked);
+    console.log('  - Failed snapshots:', failedCount);
+    
+    if (failedCount > 0) {
       console.error('[Schema Integrity Check] ⚠ INTEGRITY VIOLATIONS DETECTED!');
-      console.error('  - Failed snapshot IDs:', checkResult.failed_snapshots);
+      console.error('  - Failed snapshot IDs:', failedSnapshots);
       
       // Send alert (implement your alerting mechanism here)
-      await sendIntegrityAlert(checkResult);
+      await sendIntegrityAlert({
+        check_id: checkId,
+        total_checked: totalChecked,
+        failed_count: failedCount,
+        failed_snapshots: failedSnapshots
+      });
     } else {
       console.log('[Schema Integrity Check] ✓ All snapshots verified successfully');
     }
     
     return {
-      success: checkResult.failed_count === 0,
-      check_id: checkResult.check_id,
-      total_checked: checkResult.total_checked,
-      failed_count: checkResult.failed_count,
-      failed_snapshots: checkResult.failed_snapshots,
+      success: failedCount === 0,
+      check_id: checkId,
+      total_checked: totalChecked,
+      failed_count: failedCount,
+      failed_snapshots: failedSnapshots,
       duration_ms: duration
     };
     
@@ -147,15 +209,9 @@ async function getLatestIntegrityCheck() {
  * Verify integrity of a single snapshot
  */
 async function verifySnapshotIntegrity(snapshotId) {
-  const sql = `SELECT * FROM verify_schema_integrity($1)`;
-  
-  const result = await query(sql, [snapshotId]);
-  
-  if (result.rows.length === 0) {
-    throw new Error(`Schema snapshot not found: ${snapshotId}`);
-  }
-  
-  return result.rows[0];
+  // Use system-level verification (bypasses tenant check)
+  const verification = await schemaService.verifySchemaIntegritySystem(snapshotId);
+  return verification;
 }
 
 /**

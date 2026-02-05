@@ -15,20 +15,21 @@ describe('Schema Integrity Check Job (Task 2.2.2)', () => {
   let testSnapshotIds = [];
   
   beforeAll(async () => {
-    // Create test tenant
+    // Create test tenant with unique subdomain
+    const uniqueSubdomain = `test-integrity-job-${Date.now()}`;
     const tenantResult = await query(`
       INSERT INTO tenants (name, subdomain, tier)
-      VALUES ('Test Integrity Job Tenant', 'test-integrity-job', 'Enterprise')
+      VALUES ('Test Integrity Job Tenant', $1, 'Enterprise')
       RETURNING tenant_id
-    `);
+    `, [uniqueSubdomain]);
     testTenantId = tenantResult.rows[0].tenant_id;
     
     // Create test user
     const userResult = await query(`
       INSERT INTO users (tenant_id, email, password_hash, first_name, last_name)
-      VALUES ($1, 'integrity-job@test.com', 'hash', 'Test', 'User')
+      VALUES ($1, $2, 'hash', 'Test', 'User')
       RETURNING user_id
-    `, [testTenantId]);
+    `, [testTenantId, `integrity-job-${Date.now()}@test.com`]);
     testUserId = userResult.rows[0].user_id;
     
     // Create multiple test schema snapshots
