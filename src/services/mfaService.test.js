@@ -29,6 +29,15 @@ describe('MFAService', () => {
   let mockPool;
   let mockClient;
 
+  beforeAll(() => {
+    // Set MFA encryption key for tests
+    process.env.MFA_ENCRYPTION_KEY = 'test_mfa_encryption_key_32_chars_minimum_12345';
+  });
+
+  afterAll(() => {
+    delete process.env.MFA_ENCRYPTION_KEY;
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockPool = new Pool();

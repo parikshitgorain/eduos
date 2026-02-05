@@ -589,7 +589,16 @@ class MFAService {
    * @returns {Buffer} Encryption key
    */
   getEncryptionKey() {
-    const key = process.env.MFA_ENCRYPTION_KEY || 'default-key-change-in-production-32';
+    const key = process.env.MFA_ENCRYPTION_KEY;
+    
+    if (!key) {
+      throw new Error('MFA_ENCRYPTION_KEY environment variable is required. Must be at least 32 characters.');
+    }
+    
+    if (key.length < 32) {
+      throw new Error('MFA_ENCRYPTION_KEY must be at least 32 characters long for security.');
+    }
+    
     return crypto.createHash('sha256').update(key).digest();
   }
 

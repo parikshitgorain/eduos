@@ -18,7 +18,11 @@ require('dotenv').config();
  * @returns {string} JWT token
  */
 function generateToken(payload, expiresIn = '1h') {
-  const secret = process.env.JWT_SECRET || 'your-secret-key';
+  const secret = process.env.JWT_SECRET;
+  
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
   
   return jwt.sign(payload, secret, { expiresIn });
 }
