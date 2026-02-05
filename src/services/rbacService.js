@@ -152,12 +152,16 @@ class RBACService {
 
       // Log the role assignment
       await query(
-        `INSERT INTO audit_logs (tenant_id, user_id, action, resource_type, resource_id, details)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO audit_logs (tenant_id, user_id, action, event_type, event_action, actor_type, actor_id, resource_type, resource_id, details)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
         [
           tenantId,
           assignedBy,
           'role_assigned',
+          'rbac',
+          'role_assigned',
+          'user',
+          assignedBy,
           'user_role',
           result.rows[0].user_role_id,
           JSON.stringify({
@@ -209,12 +213,16 @@ class RBACService {
 
       // Log the role removal
       await query(
-        `INSERT INTO audit_logs (tenant_id, user_id, action, resource_type, resource_id, details)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO audit_logs (tenant_id, user_id, action, event_type, event_action, actor_type, actor_id, resource_type, resource_id, details)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
         [
           tenantId,
           removedBy,
           'role_removed',
+          'rbac',
+          'role_removed',
+          'user',
+          removedBy,
           'user_role',
           result.rows[0].user_role_id,
           JSON.stringify({

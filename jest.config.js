@@ -16,5 +16,8 @@ module.exports = {
   transformIgnorePatterns: [
     'node_modules/(?!(openid-client|oauth4webapi)/)',
   ],
+  moduleNameMapper: {
+    '^openid-client$': '<rootDir>/src/__mocks__/openid-client.js',
+  },
   testTimeout: 10000,
 };
