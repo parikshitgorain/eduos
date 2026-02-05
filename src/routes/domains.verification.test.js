@@ -6,11 +6,35 @@
  */
 
 const request = require('supertest');
-const app = require('../server');
-const { query } = require('../config/database');
+const jwt = require('jsonwebtoken');
+
+// Mock Redis BEFORE requiring anything else
+jest.mock('../config/redis', () => ({
+  get: jest.fn().mockResolvedValue(null),
+  set: jest.fn().mockResolvedValue('OK'),
+  setex: jest.fn().mockResolvedValue('OK'),
+  del: jest.fn().mockResolvedValue(1),
+  keys: jest.fn().mockResolvedValue([]),
+  hgetall: jest.fn().mockResolvedValue({ hits: '0', misses: '0' }),
+  hincrby: jest.fn().mockResolvedValue(1),
+  info: jest.fn().mockResolvedValue('used_memory_human:1.00M\r\n'),
+  close: jest.fn().mockResolvedValue(undefined),
+  healthCheck: jest.fn(() => Promise.resolve(true))
+}));
 
 // Mock database
-jest.mock('../config/database');
+const mockClient = {
+  query: jest.fn(),
+  release: jest.fn()
+};
+
+jest.mock('../config/database', () => ({
+  getClient: jest.fn(() => Promise.resolve(mockClient)),
+  healthCheck: jest.fn(() => Promise.resolve(true)),
+  query: jest.fn(),
+  transaction: jest.fn(),
+  close: jest.fn()
+}));
 
 // Mock domain verification service
 jest.mock('../services/domainVerificationService', () => ({
@@ -24,42 +48,51 @@ jest.mock('../jobs/domainVerificationJob', () => ({
   triggerJob: jest.fn()
 }));
 
+const app = require('../server');
+const { getClient } = require('../config/database');
 const { provisionSSLCertificate } = require('../services/domainVerificationService');
 const { getJobStatus, triggerJob } = require('../jobs/domainVerificationJob');
 
 describe('Domain Verification API', () => {
+  const JWT_SECRET = 'test-secret-key';
   const mockTenant = {
-    tenant_id: 'tenant-123',
+    tenant_id: '11111111-1111-4111-8111-111111111111',
     name: 'Test School',
     subdomain: 'testschool',
     tier: 'business',
     status: 'active'
   };
   
+  let validToken;
+  
+  beforeAll(() => {
+    process.env.JWT_SECRET = JWT_SECRET;
+    process.env.NODE_ENV = 'test';
+    
+    // Create a valid JWT token
+    validToken = jwt.sign(
+      { tenant_id: mockTenant.tenant_id, user_id: '22222222-2222-4222-8222-222222222222' },
+      JWT_SECRET
+    );
+  });
+  
   beforeEach(() => {
     jest.clearAllMocks();
     
-    // Mock tenant context middleware
-    query.mockImplementation((text, params) => {
-      if (text.includes('SELECT * FROM tenants WHERE tenant_id')) {
-        return Promise.resolve({
-          rowCount: 1,
-          rows: [mockTenant]
-        });
-      }
-      return Promise.resolve({ rowCount: 0, rows: [] });
-    });
+    // Reset mock implementations
+    getClient.mockResolvedValue(mockClient);
+    mockClient.query.mockResolvedValue({ rows: [], rowCount: 0 });
+    mockClient.release.mockImplementation(() => {});
+  });
+  
+  afterAll(() => {
+    delete process.env.JWT_SECRET;
+    delete process.env.NODE_ENV;
   });
   
   describe('POST /api/v1/domains/:domainId/provision-ssl', () => {
     it('should provision SSL certificate successfully', async () => {
       const domainId = 'domain-123';
-      
-      // Mock tenant lookup
-      query.mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [mockTenant]
-      });
       
       // Mock SSL provisioning
       provisionSSLCertificate.mockResolvedValueOnce({
@@ -72,8 +105,7 @@ describe('Domain Verification API', () => {
       
       const response = await request(app)
         .post(`/api/v1/domains/${domainId}/provision-ssl`)
-        .set('Authorization', 'Bearer mock-token')
-        .set('X-Tenant-ID', mockTenant.tenant_id);
+        .set('Authorization', `Bearer ${validToken}`);
       
       expect(response.status).toBe(200);
       expect(response.body.message).toBe('SSL certificate provisioned successfully');
@@ -88,11 +120,6 @@ describe('Domain Verification API', () => {
     it('should return 400 when SSL provisioning fails', async () => {
       const domainId = 'domain-123';
       
-      query.mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [mockTenant]
-      });
-      
       provisionSSLCertificate.mockResolvedValueOnce({
         success: false,
         reason: 'Domain not verified'
@@ -100,8 +127,7 @@ describe('Domain Verification API', () => {
       
       const response = await request(app)
         .post(`/api/v1/domains/${domainId}/provision-ssl`)
-        .set('Authorization', 'Bearer mock-token')
-        .set('X-Tenant-ID', mockTenant.tenant_id);
+        .set('Authorization', `Bearer ${validToken}`);
       
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('SSL Provisioning Failed');
@@ -111,17 +137,11 @@ describe('Domain Verification API', () => {
     it('should return 500 when SSL provisioning throws error', async () => {
       const domainId = 'domain-123';
       
-      query.mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [mockTenant]
-      });
-      
       provisionSSLCertificate.mockRejectedValueOnce(new Error('SSL service unavailable'));
       
       const response = await request(app)
         .post(`/api/v1/domains/${domainId}/provision-ssl`)
-        .set('Authorization', 'Bearer mock-token')
-        .set('X-Tenant-ID', mockTenant.tenant_id);
+        .set('Authorization', `Bearer ${validToken}`);
       
       expect(response.status).toBe(500);
       expect(response.body.error).toBe('Internal Server Error');
@@ -130,11 +150,6 @@ describe('Domain Verification API', () => {
   
   describe('GET /api/v1/domains/jobs/status', () => {
     it('should return job status', async () => {
-      query.mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [mockTenant]
-      });
-      
       const mockJobStatus = {
         name: 'domain-verification-job',
         enabled: true,
@@ -154,8 +169,7 @@ describe('Domain Verification API', () => {
       
       const response = await request(app)
         .get('/api/v1/domains/jobs/status')
-        .set('Authorization', 'Bearer mock-token')
-        .set('X-Tenant-ID', mockTenant.tenant_id);
+        .set('Authorization', `Bearer ${validToken}`);
       
       expect(response.status).toBe(200);
       expect(response.body.job_status).toEqual(mockJobStatus);
@@ -167,11 +181,6 @@ describe('Domain Verification API', () => {
   
   describe('POST /api/v1/domains/jobs/trigger', () => {
     it('should manually trigger background job', async () => {
-      query.mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [mockTenant]
-      });
-      
       const mockJobResult = {
         success: true,
         duration: 1234,
@@ -183,8 +192,7 @@ describe('Domain Verification API', () => {
       
       const response = await request(app)
         .post('/api/v1/domains/jobs/trigger')
-        .set('Authorization', 'Bearer mock-token')
-        .set('X-Tenant-ID', mockTenant.tenant_id);
+        .set('Authorization', `Bearer ${validToken}`);
       
       expect(response.status).toBe(200);
       expect(response.body.message).toBe('Background job triggered successfully');
@@ -195,17 +203,11 @@ describe('Domain Verification API', () => {
     });
     
     it('should return 500 when job trigger fails', async () => {
-      query.mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [mockTenant]
-      });
-      
       triggerJob.mockRejectedValueOnce(new Error('Job execution failed'));
       
       const response = await request(app)
         .post('/api/v1/domains/jobs/trigger')
-        .set('Authorization', 'Bearer mock-token')
-        .set('X-Tenant-ID', mockTenant.tenant_id);
+        .set('Authorization', `Bearer ${validToken}`);
       
       expect(response.status).toBe(500);
       expect(response.body.error).toBe('Internal Server Error');
