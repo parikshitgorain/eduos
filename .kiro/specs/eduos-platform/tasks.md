@@ -97,7 +97,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - Session revocation API for logout and security events
     - Session activity tracking for audit logs
 
-- [ ] 1.3.4 Implement multi-factor authentication (MFA)
+- [x] 1.3.4 Implement multi-factor authentication (MFA)
   - **Definition of Done:**
     - TOTP-based MFA using authenticator apps
     - QR code generation for MFA setup
