@@ -706,6 +706,276 @@ async function deleteBatch(batchId, tenantId) {
   });
 }
 
+// ============================================================================
+// HIERARCHY NAVIGATION OPERATIONS (Task 2.1.2)
+// ============================================================================
+
+/**
+ * Get children of a hierarchy node
+ * Returns immediate children based on entity type
+ */
+async function getNodeChildren(nodeId, entityType, tenantId) {
+  // Validate entity type
+  const validTypes = ['institute', 'center', 'program', 'batch'];
+  if (!validTypes.includes(entityType)) {
+    throw new Error(`Invalid entity type: ${entityType}`);
+  }
+  
+  // Batch has no children
+  if (entityType === 'batch') {
+    return [];
+  }
+  
+  // Map entity types to their child tables and relationships
+  const childMapping = {
+    institute: { table: 'centers', parentColumn: 'institute_id', childIdColumn: 'center_id' },
+    center: { table: 'programs', parentColumn: 'center_id', childIdColumn: 'program_id' },
+    program: { table: 'batches', parentColumn: 'program_id', childIdColumn: 'batch_id' }
+  };
+  
+  const mapping = childMapping[entityType];
+  
+  const sql = `
+    SELECT * FROM ${mapping.table}
+    WHERE ${mapping.parentColumn} = $1 AND tenant_id = $2
+    ORDER BY created_at DESC
+  `;
+  
+  const result = await query(sql, [nodeId, tenantId]);
+  return result.rows;
+}
+
+/**
+ * Get ancestors of a hierarchy node (parent chain)
+ * Returns array from root to immediate parent
+ */
+async function getNodeAncestors(nodeId, entityType, tenantId) {
+  // Validate entity type
+  const validTypes = ['institute', 'center', 'program', 'batch'];
+  if (!validTypes.includes(entityType)) {
+    throw new Error(`Invalid entity type: ${entityType}`);
+  }
+  
+  // Institute has no ancestors
+  if (entityType === 'institute') {
+    return [];
+  }
+  
+  const ancestors = [];
+  
+  // Build ancestor chain based on entity type
+  if (entityType === 'batch') {
+    // Get batch -> program -> center -> institute
+    const batch = await getBatchById(nodeId, tenantId);
+    if (!batch) {
+      throw new Error('Batch not found');
+    }
+    
+    const program = await getProgramById(batch.program_id, tenantId);
+    if (program) {
+      ancestors.push({
+        entity_type: 'program',
+        entity_id: program.program_id,
+        name: program.name,
+        code: program.code
+      });
+      
+      const center = await getCenterById(program.center_id, tenantId);
+      if (center) {
+        ancestors.push({
+          entity_type: 'center',
+          entity_id: center.center_id,
+          name: center.name,
+          code: center.code
+        });
+        
+        const institute = await getInstituteById(center.institute_id, tenantId);
+        if (institute) {
+          ancestors.push({
+            entity_type: 'institute',
+            entity_id: institute.institute_id,
+            name: institute.name,
+            code: institute.code
+          });
+        }
+      }
+    }
+  } else if (entityType === 'program') {
+    // Get program -> center -> institute
+    const program = await getProgramById(nodeId, tenantId);
+    if (!program) {
+      throw new Error('Program not found');
+    }
+    
+    const center = await getCenterById(program.center_id, tenantId);
+    if (center) {
+      ancestors.push({
+        entity_type: 'center',
+        entity_id: center.center_id,
+        name: center.name,
+        code: center.code
+      });
+      
+      const institute = await getInstituteById(center.institute_id, tenantId);
+      if (institute) {
+        ancestors.push({
+          entity_type: 'institute',
+          entity_id: institute.institute_id,
+          name: institute.name,
+          code: institute.code
+        });
+      }
+    }
+  } else if (entityType === 'center') {
+    // Get center -> institute
+    const center = await getCenterById(nodeId, tenantId);
+    if (!center) {
+      throw new Error('Center not found');
+    }
+    
+    const institute = await getInstituteById(center.institute_id, tenantId);
+    if (institute) {
+      ancestors.push({
+        entity_type: 'institute',
+        entity_id: institute.institute_id,
+        name: institute.name,
+        code: institute.code
+      });
+    }
+  }
+  
+  // Reverse to get root-to-parent order
+  return ancestors.reverse();
+}
+
+/**
+ * Resolve permissions for a field based on hierarchy
+ * Child levels can only restrict, not expand permissions
+ */
+function resolveFieldPermissions(fieldConfig, userContext) {
+  // Start with global permissions
+  let visibleToRoles = new Set(fieldConfig.global_permissions?.visible_to_roles || []);
+  let editableByRoles = new Set(fieldConfig.global_permissions?.editable_by_roles || []);
+  
+  // Apply hierarchy restrictions in order: institute -> center -> program -> batch
+  const hierarchyLevels = ['institute', 'center', 'program', 'batch'];
+  
+  for (const level of hierarchyLevels) {
+    const levelId = userContext[`${level}_id`];
+    if (!levelId) continue;
+    
+    const override = fieldConfig[`${level}_overrides`]?.[levelId];
+    if (override) {
+      // Intersection: child can only restrict, not expand
+      if (override.visible_to_roles) {
+        const overrideVisible = new Set(override.visible_to_roles);
+        visibleToRoles = new Set([...visibleToRoles].filter(role => overrideVisible.has(role)));
+      }
+      
+      if (override.editable_by_roles) {
+        const overrideEditable = new Set(override.editable_by_roles);
+        editableByRoles = new Set([...editableByRoles].filter(role => overrideEditable.has(role)));
+      }
+    }
+  }
+  
+  return {
+    visible_to_roles: Array.from(visibleToRoles),
+    editable_by_roles: Array.from(editableByRoles)
+  };
+}
+
+/**
+ * Get full hierarchy tree for a tenant
+ * Returns nested structure with all entities
+ */
+async function getHierarchyTree(tenantId, options = {}) {
+  const { includeInactive = false } = options;
+  
+  // Get all institutes
+  const institutesResult = await listInstitutes(tenantId, { 
+    limit: 1000,
+    status: includeInactive ? undefined : 'active'
+  });
+  
+  const tree = [];
+  
+  for (const institute of institutesResult.institutes) {
+    const instituteNode = {
+      entity_type: 'institute',
+      entity_id: institute.institute_id,
+      name: institute.name,
+      code: institute.code,
+      status: institute.status,
+      children: []
+    };
+    
+    // Get centers for this institute
+    const centersResult = await listCenters(tenantId, {
+      instituteId: institute.institute_id,
+      limit: 1000,
+      status: includeInactive ? undefined : 'active'
+    });
+    
+    for (const center of centersResult.centers) {
+      const centerNode = {
+        entity_type: 'center',
+        entity_id: center.center_id,
+        name: center.name,
+        code: center.code,
+        status: center.status,
+        children: []
+      };
+      
+      // Get programs for this center
+      const programsResult = await listPrograms(tenantId, {
+        centerId: center.center_id,
+        limit: 1000,
+        status: includeInactive ? undefined : 'active'
+      });
+      
+      for (const program of programsResult.programs) {
+        const programNode = {
+          entity_type: 'program',
+          entity_id: program.program_id,
+          name: program.name,
+          code: program.code,
+          status: program.status,
+          children: []
+        };
+        
+        // Get batches for this program
+        const batchesResult = await listBatches(tenantId, {
+          programId: program.program_id,
+          limit: 1000,
+          status: includeInactive ? undefined : 'active'
+        });
+        
+        for (const batch of batchesResult.batches) {
+          programNode.children.push({
+            entity_type: 'batch',
+            entity_id: batch.batch_id,
+            name: batch.name,
+            code: batch.code,
+            status: batch.status,
+            start_date: batch.start_date,
+            end_date: batch.end_date,
+            capacity: batch.capacity
+          });
+        }
+        
+        centerNode.children.push(programNode);
+      }
+      
+      instituteNode.children.push(centerNode);
+    }
+    
+    tree.push(instituteNode);
+  }
+  
+  return tree;
+}
+
 module.exports = {
   // Institute operations
   createInstitute,
@@ -733,5 +1003,11 @@ module.exports = {
   getBatchById,
   listBatches,
   updateBatch,
-  deleteBatch
+  deleteBatch,
+  
+  // Hierarchy navigation (Task 2.1.2)
+  getNodeChildren,
+  getNodeAncestors,
+  resolveFieldPermissions,
+  getHierarchyTree
 };

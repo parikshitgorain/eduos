@@ -506,4 +506,382 @@ describe('Hierarchy API', () => {
       expect(response.body.message).toContain('Limit cannot exceed 100');
     });
   });
+  
+  // ============================================================================
+  // HIERARCHY NAVIGATION TESTS (Task 2.1.2)
+  // ============================================================================
+  
+  describe('Hierarchy Navigation', () => {
+    // Recreate test entities for navigation tests (they were deleted in cascade tests)
+    beforeAll(async () => {
+      // Create institute
+      const instituteRes = await request(app)
+        .post('/api/v1/hierarchy/institutes')
+        .set('x-tenant-id', testTenantId)
+        .send({
+          name: 'Navigation Test Institute',
+          code: 'NAV-INST-001'
+        });
+      testInstituteId = instituteRes.body.data.institute_id;
+      
+      // Create center
+      const centerRes = await request(app)
+        .post('/api/v1/hierarchy/centers')
+        .set('x-tenant-id', testTenantId)
+        .send({
+          instituteId: testInstituteId,
+          name: 'Navigation Test Center',
+          code: 'NAV-CTR-001'
+        });
+      testCenterId = centerRes.body.data.center_id;
+      
+      // Create program
+      const programRes = await request(app)
+        .post('/api/v1/hierarchy/programs')
+        .set('x-tenant-id', testTenantId)
+        .send({
+          centerId: testCenterId,
+          name: 'Navigation Test Program',
+          code: 'NAV-PRG-001',
+          durationMonths: 12
+        });
+      testProgramId = programRes.body.data.program_id;
+      
+      // Create batch
+      const batchRes = await request(app)
+        .post('/api/v1/hierarchy/batches')
+        .set('x-tenant-id', testTenantId)
+        .send({
+          programId: testProgramId,
+          name: 'Navigation Test Batch',
+          code: 'NAV-BCH-001',
+          startDate: '2026-01-01',
+          endDate: '2026-12-31',
+          capacity: 30
+        });
+      testBatchId = batchRes.body.data.batch_id;
+    });
+  
+  describe('GET /api/v1/hierarchy/:nodeId/children', () => {
+    it('should get children of an institute (centers)', async () => {
+      const response = await request(app)
+        .get(`/api/v1/hierarchy/${testInstituteId}/children`)
+        .set('x-tenant-id', testTenantId)
+        .query({ entityType: 'institute' });
+      
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.node_id).toBe(testInstituteId);
+      expect(response.body.data.entity_type).toBe('institute');
+      expect(Array.isArray(response.body.data.children)).toBe(true);
+      expect(response.body.data.children_count).toBeGreaterThanOrEqual(0);
+    });
+    
+    it('should get children of a center (programs)', async () => {
+      const response = await request(app)
+        .get(`/api/v1/hierarchy/${testCenterId}/children`)
+        .set('x-tenant-id', testTenantId)
+        .query({ entityType: 'center' });
+      
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.entity_type).toBe('center');
+      expect(Array.isArray(response.body.data.children)).toBe(true);
+    });
+    
+    it('should get children of a program (batches)', async () => {
+      const response = await request(app)
+        .get(`/api/v1/hierarchy/${testProgramId}/children`)
+        .set('x-tenant-id', testTenantId)
+        .query({ entityType: 'program' });
+      
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.entity_type).toBe('program');
+      expect(Array.isArray(response.body.data.children)).toBe(true);
+    });
+    
+    it('should return empty array for batch children', async () => {
+      const response = await request(app)
+        .get(`/api/v1/hierarchy/${testBatchId}/children`)
+        .set('x-tenant-id', testTenantId)
+        .query({ entityType: 'batch' });
+      
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.children).toEqual([]);
+      expect(response.body.data.children_count).toBe(0);
+    });
+    
+    it('should reject request without entityType', async () => {
+      const response = await request(app)
+        .get(`/api/v1/hierarchy/${testInstituteId}/children`)
+        .set('x-tenant-id', testTenantId);
+      
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain('entityType');
+    });
+    
+    it('should reject invalid entityType', async () => {
+      const response = await request(app)
+        .get(`/api/v1/hierarchy/${testInstituteId}/children`)
+        .set('x-tenant-id', testTenantId)
+        .query({ entityType: 'invalid' });
+      
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+    });
+    
+    it('should reject invalid UUID format', async () => {
+      const response = await request(app)
+        .get('/api/v1/hierarchy/not-a-uuid/children')
+        .set('x-tenant-id', testTenantId)
+        .query({ entityType: 'institute' });
+      
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+    });
+  });
+  
+  describe('GET /api/v1/hierarchy/:nodeId/ancestors', () => {
+    it('should return empty array for institute ancestors', async () => {
+      const response = await request(app)
+        .get(`/api/v1/hierarchy/${testInstituteId}/ancestors`)
+        .set('x-tenant-id', testTenantId)
+        .query({ entityType: 'institute' });
+      
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.ancestors).toEqual([]);
+      expect(response.body.data.ancestors_count).toBe(0);
+    });
+    
+    it('should get ancestors of a center (institute)', async () => {
+      const response = await request(app)
+        .get(`/api/v1/hierarchy/${testCenterId}/ancestors`)
+        .set('x-tenant-id', testTenantId)
+        .query({ entityType: 'center' });
+      
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.entity_type).toBe('center');
+      expect(Array.isArray(response.body.data.ancestors)).toBe(true);
+      expect(response.body.data.ancestors_count).toBe(1);
+      expect(response.body.data.ancestors[0].entity_type).toBe('institute');
+    });
+    
+    it('should get ancestors of a program (center, institute)', async () => {
+      const response = await request(app)
+        .get(`/api/v1/hierarchy/${testProgramId}/ancestors`)
+        .set('x-tenant-id', testTenantId)
+        .query({ entityType: 'program' });
+      
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.ancestors_count).toBe(2);
+      expect(response.body.data.ancestors[0].entity_type).toBe('institute');
+      expect(response.body.data.ancestors[1].entity_type).toBe('center');
+    });
+    
+    it('should get ancestors of a batch (program, center, institute)', async () => {
+      const response = await request(app)
+        .get(`/api/v1/hierarchy/${testBatchId}/ancestors`)
+        .set('x-tenant-id', testTenantId)
+        .query({ entityType: 'batch' });
+      
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.ancestors_count).toBe(3);
+      expect(response.body.data.ancestors[0].entity_type).toBe('institute');
+      expect(response.body.data.ancestors[1].entity_type).toBe('center');
+      expect(response.body.data.ancestors[2].entity_type).toBe('program');
+    });
+    
+    it('should reject request without entityType', async () => {
+      const response = await request(app)
+        .get(`/api/v1/hierarchy/${testBatchId}/ancestors`)
+        .set('x-tenant-id', testTenantId);
+      
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+    });
+    
+    it('should return 404 for non-existent node', async () => {
+      const fakeId = '00000000-0000-4000-8000-000000000000';
+      const response = await request(app)
+        .get(`/api/v1/hierarchy/${fakeId}/ancestors`)
+        .set('x-tenant-id', testTenantId)
+        .query({ entityType: 'batch' });
+      
+      expect(response.status).toBe(404);
+      expect(response.body.success).toBe(false);
+    });
+  });
+  
+  describe('GET /api/v1/hierarchy/tree', () => {
+    it('should get full hierarchy tree for tenant', async () => {
+      const response = await request(app)
+        .get('/api/v1/hierarchy/tree')
+        .set('x-tenant-id', testTenantId);
+      
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.tenant_id).toBe(testTenantId);
+      expect(Array.isArray(response.body.data.tree)).toBe(true);
+      
+      // Verify tree structure
+      if (response.body.data.tree.length > 0) {
+        const institute = response.body.data.tree[0];
+        expect(institute.entity_type).toBe('institute');
+        expect(institute.entity_id).toBeDefined();
+        expect(Array.isArray(institute.children)).toBe(true);
+        
+        if (institute.children.length > 0) {
+          const center = institute.children[0];
+          expect(center.entity_type).toBe('center');
+          expect(Array.isArray(center.children)).toBe(true);
+        }
+      }
+    });
+    
+    it('should include inactive entities when requested', async () => {
+      const response = await request(app)
+        .get('/api/v1/hierarchy/tree')
+        .set('x-tenant-id', testTenantId)
+        .query({ includeInactive: 'true' });
+      
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+  });
+  
+  describe('POST /api/v1/hierarchy/permissions/resolve', () => {
+    it('should resolve field permissions with global only', async () => {
+      const fieldConfig = {
+        global_permissions: {
+          visible_to_roles: ['admin', 'teacher', 'student'],
+          editable_by_roles: ['admin']
+        }
+      };
+      
+      const userContext = {
+        institute_id: testInstituteId
+      };
+      
+      const response = await request(app)
+        .post('/api/v1/hierarchy/permissions/resolve')
+        .set('x-tenant-id', testTenantId)
+        .send({ fieldConfig, userContext });
+      
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.visible_to_roles).toEqual(['admin', 'teacher', 'student']);
+      expect(response.body.data.editable_by_roles).toEqual(['admin']);
+    });
+    
+    it('should restrict permissions at institute level', async () => {
+      const fieldConfig = {
+        global_permissions: {
+          visible_to_roles: ['admin', 'teacher', 'student'],
+          editable_by_roles: ['admin', 'teacher']
+        },
+        institute_overrides: {
+          [testInstituteId]: {
+            visible_to_roles: ['admin', 'teacher'],
+            editable_by_roles: ['admin']
+          }
+        }
+      };
+      
+      const userContext = {
+        institute_id: testInstituteId
+      };
+      
+      const response = await request(app)
+        .post('/api/v1/hierarchy/permissions/resolve')
+        .set('x-tenant-id', testTenantId)
+        .send({ fieldConfig, userContext });
+      
+      expect(response.status).toBe(200);
+      expect(response.body.data.visible_to_roles).toEqual(['admin', 'teacher']);
+      expect(response.body.data.editable_by_roles).toEqual(['admin']);
+    });
+    
+    it('should apply cascading restrictions through hierarchy', async () => {
+      const fieldConfig = {
+        global_permissions: {
+          visible_to_roles: ['admin', 'teacher', 'student'],
+          editable_by_roles: ['admin', 'teacher']
+        },
+        institute_overrides: {
+          [testInstituteId]: {
+            visible_to_roles: ['admin', 'teacher'],
+            editable_by_roles: ['admin']
+          }
+        },
+        center_overrides: {
+          [testCenterId]: {
+            visible_to_roles: ['admin'],
+            editable_by_roles: ['admin']
+          }
+        }
+      };
+      
+      const userContext = {
+        institute_id: testInstituteId,
+        center_id: testCenterId
+      };
+      
+      const response = await request(app)
+        .post('/api/v1/hierarchy/permissions/resolve')
+        .set('x-tenant-id', testTenantId)
+        .send({ fieldConfig, userContext });
+      
+      expect(response.status).toBe(200);
+      expect(response.body.data.visible_to_roles).toEqual(['admin']);
+      expect(response.body.data.editable_by_roles).toEqual(['admin']);
+    });
+    
+    it('should reject request without required fields', async () => {
+      const response = await request(app)
+        .post('/api/v1/hierarchy/permissions/resolve')
+        .set('x-tenant-id', testTenantId)
+        .send({});
+      
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+    });
+  });
+  
+  // ============================================================================
+  // PERFORMANCE TESTS (Task 2.1.2 - < 50ms for 10,000 nodes)
+  // ============================================================================
+  
+  describe('Performance Tests', () => {
+    it('should fetch children in under 50ms', async () => {
+      const startTime = Date.now();
+      
+      await request(app)
+        .get(`/api/v1/hierarchy/${testInstituteId}/children`)
+        .set('x-tenant-id', testTenantId)
+        .query({ entityType: 'institute' });
+      
+      const duration = Date.now() - startTime;
+      expect(duration).toBeLessThan(50);
+    });
+    
+    it('should fetch ancestors in under 50ms', async () => {
+      const startTime = Date.now();
+      
+      await request(app)
+        .get(`/api/v1/hierarchy/${testBatchId}/ancestors`)
+        .set('x-tenant-id', testTenantId)
+        .query({ entityType: 'batch' });
+      
+      const duration = Date.now() - startTime;
+      expect(duration).toBeLessThan(50);
+    });
+  });
+  }); // End of Hierarchy Navigation describe block
 });

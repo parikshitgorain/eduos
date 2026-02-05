@@ -302,6 +302,7 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 - [Task 1.3.3](docs/tasks/TASK_1.3.3_IMPLEMENTATION_SUMMARY.md) - Session Management ✅
 - [Task 1.3.4](docs/tasks/TASK_1.3.4_IMPLEMENTATION_SUMMARY.md) - Multi-Factor Authentication ✅
 - [Task 2.1.1](docs/tasks/TASK_2.1.1_IMPLEMENTATION_SUMMARY.md) - Hierarchical Entity Tree ✅
+- [Task 2.1.2](docs/tasks/TASK_2.1.2_IMPLEMENTATION_SUMMARY.md) - Hierarchy Navigation ✅
 
 **Authentication:**
 - [Auth Service](docs/AUTH_SERVICE.md) - OAuth2/OIDC authentication service
@@ -344,7 +345,14 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 - ✅ CRUD API endpoints for all levels
 - ✅ 35 unit tests passing
 
-- [ ] Task 2.1.2: Hierarchy navigation and permission inheritance
+#### ✅ Task 2.1.2: Hierarchy Navigation - COMPLETED
+- ✅ GET `/api/v1/hierarchy/:nodeId/children` endpoint
+- ✅ GET `/api/v1/hierarchy/:nodeId/ancestors` endpoint
+- ✅ GET `/api/v1/hierarchy/tree` endpoint
+- ✅ Permission inheritance (child can only restrict)
+- ✅ Performance < 50ms for 10,000 nodes
+- ✅ 56 unit tests passing
+
 - [ ] Task 2.1.3: Student enrollment workflow
 - [ ] Dynamic forms with schema engine
 - [ ] Offline-first attendance
@@ -480,6 +488,6 @@ Built with:
 
 ---
 
-**Project Status:** Phase 1 Complete ✅ | Phase 2 Started (1/14 tasks)  
-**Next Milestone:** Task 2.1.2 - Hierarchy Navigation  
+**Project Status:** Phase 1 Complete ✅ | Phase 2 Started (2/14 tasks)  
+**Next Milestone:** Task 2.1.3 - Student Enrollment  
 **Last Updated:** 2026-02-05

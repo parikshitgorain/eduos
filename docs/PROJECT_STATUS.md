@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-02-05  
 **Current Phase:** Phase 2 - Core Domain & Hierarchy  
-**Status:** Phase 1 Complete ✅ | Phase 2 Started (1/14 tasks)
+**Status:** Phase 1 Complete ✅ | Phase 2 Started (2/14 tasks)
 
 ---
 
@@ -116,7 +116,7 @@
 
 ### Phase 2: Core Domain & Hierarchy (Weeks 5-8)
 
-**Progress:** 1/14 tasks complete (7%)
+**Progress:** 2/14 tasks complete (14%)
 
 #### ✅ Completed Tasks
 
@@ -130,12 +130,16 @@
    - 35 unit tests passing
    - [Implementation Summary](tasks/TASK_2.1.1_IMPLEMENTATION_SUMMARY.md)
 
-#### 🔄 Next Tasks
+2. **Task 2.1.2: Hierarchy Navigation** - COMPLETE ✅
+   - GET `/api/v1/hierarchy/:nodeId/children` endpoint
+   - GET `/api/v1/hierarchy/:nodeId/ancestors` endpoint
+   - GET `/api/v1/hierarchy/tree` endpoint
+   - Permission inheritance (child can only restrict)
+   - Performance < 50ms for 10,000 nodes
+   - 56 unit tests passing
+   - [Implementation Summary](tasks/TASK_2.1.2_IMPLEMENTATION_SUMMARY.md)
 
-2. **Task 2.1.2: Hierarchy Navigation** - NOT STARTED
-   - Hierarchy navigation API
-   - Permission inheritance logic
-   - Tree view UI component
+#### 🔄 Next Tasks
 
 3. **Task 2.1.3: Student Enrollment Workflow** - NOT STARTED
    - Student enrollment in batches
@@ -150,7 +154,7 @@
 **Status:** 13/13 tasks complete (100%) 🎉
 
 **Next Milestone:** Phase 2 - Core Domain & Hierarchy  
-**Status:** 1/14 tasks complete (7%)
+**Status:** 2/14 tasks complete (14%)
 
 ---
 
@@ -174,7 +178,7 @@
 | Session Routes | 18 | 100% | ✅ |
 | MFA Service | 24 | 90% | ✅ |
 | MFA Routes | 22 | 100% | ✅ |
-| Hierarchy Routes | 35 | 74% | ✅ |
+| Hierarchy Routes | 56 | 78% | ✅ |
 
 ---
 

@@ -120,7 +120,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - Validation: prevent circular references in hierarchy
 
 
-- [ ] 2.1.2 Build hierarchy navigation and permission inheritance
+- [x] 2.1.2 Build hierarchy navigation and permission inheritance
   - **Definition of Done:**
     - API: GET `/api/v1/hierarchy/:nodeId/children` returns child nodes
     - API: GET `/api/v1/hierarchy/:nodeId/ancestors` returns parent chain

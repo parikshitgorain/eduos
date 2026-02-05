@@ -1007,4 +1007,198 @@ router.delete('/batches/:batchId', validateUUID('batchId'), async (req, res) => 
   }
 });
 
+// ============================================================================
+// HIERARCHY NAVIGATION ROUTES (Task 2.1.2)
+// ============================================================================
+
+/**
+ * GET /api/v1/hierarchy/:nodeId/children
+ * Get children of a hierarchy node
+ */
+router.get('/:nodeId/children', validateUUID('nodeId'), async (req, res) => {
+  try {
+    const { entityType } = req.query;
+    
+    if (!entityType) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'entityType query parameter is required (institute, center, program, or batch)'
+      });
+    }
+    
+    const validTypes = ['institute', 'center', 'program', 'batch'];
+    if (!validTypes.includes(entityType)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'Invalid entityType. Must be one of: institute, center, program, batch'
+      });
+    }
+    
+    const children = await hierarchyService.getNodeChildren(
+      req.params.nodeId,
+      entityType,
+      req.tenantId
+    );
+    
+    res.json({
+      success: true,
+      data: {
+        node_id: req.params.nodeId,
+        entity_type: entityType,
+        children_count: children.length,
+        children
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching node children:', error);
+    
+    if (error.message.includes('Invalid entity type')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: error.message
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to fetch node children'
+    });
+  }
+});
+
+/**
+ * GET /api/v1/hierarchy/:nodeId/ancestors
+ * Get ancestors (parent chain) of a hierarchy node
+ */
+router.get('/:nodeId/ancestors', validateUUID('nodeId'), async (req, res) => {
+  try {
+    const { entityType } = req.query;
+    
+    if (!entityType) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'entityType query parameter is required (institute, center, program, or batch)'
+      });
+    }
+    
+    const validTypes = ['institute', 'center', 'program', 'batch'];
+    if (!validTypes.includes(entityType)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'Invalid entityType. Must be one of: institute, center, program, batch'
+      });
+    }
+    
+    const ancestors = await hierarchyService.getNodeAncestors(
+      req.params.nodeId,
+      entityType,
+      req.tenantId
+    );
+    
+    res.json({
+      success: true,
+      data: {
+        node_id: req.params.nodeId,
+        entity_type: entityType,
+        ancestors_count: ancestors.length,
+        ancestors
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching node ancestors:', error);
+    
+    if (error.message.includes('not found')) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: error.message
+      });
+    }
+    
+    if (error.message.includes('Invalid entity type')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: error.message
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to fetch node ancestors'
+    });
+  }
+});
+
+/**
+ * GET /api/v1/hierarchy/tree
+ * Get full hierarchy tree for the tenant
+ */
+router.get('/tree', async (req, res) => {
+  try {
+    const { includeInactive } = req.query;
+    
+    const tree = await hierarchyService.getHierarchyTree(req.tenantId, {
+      includeInactive: includeInactive === 'true'
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        tenant_id: req.tenantId,
+        tree
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching hierarchy tree:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to fetch hierarchy tree'
+    });
+  }
+});
+
+/**
+ * POST /api/v1/hierarchy/permissions/resolve
+ * Resolve field permissions based on hierarchy context
+ */
+router.post('/permissions/resolve', async (req, res) => {
+  try {
+    const { fieldConfig, userContext } = req.body;
+    
+    if (!fieldConfig || !userContext) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'fieldConfig and userContext are required'
+      });
+    }
+    
+    const resolvedPermissions = hierarchyService.resolveFieldPermissions(
+      fieldConfig,
+      userContext
+    );
+    
+    res.json({
+      success: true,
+      data: resolvedPermissions
+    });
+  } catch (error) {
+    console.error('Error resolving permissions:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to resolve permissions'
+    });
+  }
+});
+
 module.exports = router;
