@@ -137,7 +137,10 @@ eduos-platform/
 | [Task 1.1.1](tasks/TASK_1.1.1_IMPLEMENTATION_SUMMARY.md) | PostgreSQL RLS Setup | ✅ Complete |
 | [Task 1.1.2](tasks/TASK_1.1.2_IMPLEMENTATION_SUMMARY.md) | Tenant Context Middleware | ✅ Complete |
 | [Task 1.1.3](tasks/TASK_1.1.3_IMPLEMENTATION_SUMMARY.md) | Tenant Provisioning API | ✅ Complete |
-| [Task 1.1.3 Test Fixes](tasks/TASK_1.1.3_TEST_FIXES.md) | Test infrastructure fixes | ✅ Complete |
+| [Task 1.2.1](tasks/TASK_1.2.1_IMPLEMENTATION_SUMMARY.md) | Custom Domain Mapping | ✅ Complete |
+| [Task 1.2.2](tasks/TASK_1.2.2_IMPLEMENTATION_SUMMARY.md) | Domain Verification Workflow | ✅ Complete |
+| [Task 1.2.3](tasks/TASK_1.2.3_IMPLEMENTATION_SUMMARY.md) | Tenant Routing Cache Layer | ✅ Complete |
+| [Task 1.2.3 Verification](tasks/TASK_1.2.3_VERIFICATION_REPORT.md) | Complete verification report | ✅ Verified |
 
 ### 6. Utility Scripts
 
@@ -257,13 +260,19 @@ All documentation should include:
 - ✅ Task 1.1.1 Summary
 - ✅ Task 1.1.2 Summary
 - ✅ Task 1.1.3 Summary
+- ✅ Task 1.2.1 Summary (Domain Mapping)
+- ✅ Task 1.2.2 Summary (Domain Verification)
+- ✅ Task 1.2.3 Summary (Cache Layer)
+- ✅ Task 1.2.3 Verification Report
+- ✅ Domain Mapping Guide
+- ✅ Domain Verification Workflow Guide
+- ✅ Cache Layer Architecture Guide
 - ✅ Requirements Specification
 - ✅ Design Document
 - ✅ Task List
 
 ### Pending Documentation
 
-- ⏸️ Domain Resolution API (Task 1.2.1)
 - ⏸️ Auth Service Documentation (Task 1.3.1)
 - ⏸️ Deployment Guide
 - ⏸️ Monitoring Guide
@@ -303,4 +312,4 @@ If you find issues with documentation:
 
 **Last Updated:** 2026-02-05  
 **Documentation Version:** 1.0  
-**Project Phase:** Phase 1 - Task 1.1.3 Complete
+**Project Phase:** Phase 1 - Task 1.2.3 Complete (6/13 tasks)
