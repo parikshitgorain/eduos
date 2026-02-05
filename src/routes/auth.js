@@ -184,12 +184,16 @@ router.get('/:provider/callback', async (req, res) => {
 
     // Log authentication event
     await query(
-      `INSERT INTO audit_logs (tenant_id, user_id, action, resource_type, details)
-       VALUES ($1, $2, $3, $4, $5)`,
+      `INSERT INTO audit_logs (tenant_id, user_id, action, event_type, event_action, actor_type, actor_id, resource_type, details)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         userInfo.tenantId,
         userId,
         'user_login',
+        'authentication',
+        'login',
+        'user',
+        userId,
         'authentication',
         JSON.stringify({
           provider: provider,
@@ -351,12 +355,16 @@ router.post('/logout', async (req, res) => {
 
       // Log logout event
       await query(
-        `INSERT INTO audit_logs (tenant_id, user_id, action, resource_type, details)
-         VALUES ($1, $2, $3, $4, $5)`,
+        `INSERT INTO audit_logs (tenant_id, user_id, action, event_type, event_action, actor_type, actor_id, resource_type, details)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
           decoded.tenant_id,
           decoded.sub,
           'user_logout',
+          'authentication',
+          'logout',
+          'user',
+          decoded.sub,
           'authentication',
           JSON.stringify({
             method: 'manual',
