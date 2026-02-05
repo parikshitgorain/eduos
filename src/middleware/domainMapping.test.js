@@ -20,15 +20,16 @@ describe('Domain Mapping Middleware', () => {
   let testDomain;
   
   beforeAll(async () => {
-    // Create test tenant
+    // Create test tenant with unique subdomain
+    const uniqueSubdomain = `testschool-${Date.now()}`;
     const tenantResult = await query(
       `INSERT INTO tenants (name, subdomain, tier, status)
        VALUES ($1, $2, $3, $4)
        RETURNING tenant_id`,
-      ['Test School', 'testschool', 'Basic', 'active']
+      ['Test School', uniqueSubdomain, 'Basic', 'active']
     );
     testTenantId = tenantResult.rows[0].tenant_id;
-    testDomain = 'testschool.eduos.com';
+    testDomain = `${uniqueSubdomain}.eduos.com`;
     
     // Clear cache before tests
     clearCache();

@@ -6,33 +6,38 @@
 
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
+
+// Mock database BEFORE requiring the app
+const mockClient = {
+  query: jest.fn(),
+  release: jest.fn()
+};
+
+jest.mock('./config/database', () => ({
+  getClient: jest.fn(() => Promise.resolve(mockClient)),
+  healthCheck: jest.fn(() => Promise.resolve(true)),
+  query: jest.fn(),
+  transaction: jest.fn(),
+  close: jest.fn()
+}));
+
+// Mock Redis to avoid connection errors
+jest.mock('./config/redis', () => ({
+  get: jest.fn(),
+  set: jest.fn(),
+  del: jest.fn(),
+  close: jest.fn(),
+  healthCheck: jest.fn(() => Promise.resolve(true))
+}));
+
 const app = require('./server');
-
-// Mock database
-jest.mock('./config/database', () => {
-  const mockClient = {
-    query: jest.fn(),
-    release: jest.fn()
-  };
-  
-  return {
-    getClient: jest.fn(() => Promise.resolve(mockClient)),
-    healthCheck: jest.fn(() => Promise.resolve(true)),
-    query: jest.fn(),
-    transaction: jest.fn(),
-    close: jest.fn()
-  };
-});
-
-const { getClient } = require('./config/database');
+const { getClient, healthCheck } = require('./config/database');
 
 describe('Tenant Context Middleware Integration Tests', () => {
   const JWT_SECRET = 'test-secret-key';
-  const TENANT_A_ID = '11111111-1111-1111-1111-111111111111';
-  const TENANT_B_ID = '22222222-2222-2222-2222-222222222222';
-  const USER_ID = '33333333-3333-3333-3333-333333333333';
-  
-  let mockClient;
+  const TENANT_A_ID = '11111111-1111-4111-8111-111111111111';
+  const TENANT_B_ID = '22222222-2222-4222-8222-222222222222';
+  const USER_ID = '33333333-3333-4333-8333-333333333333';
   
   beforeAll(() => {
     process.env.JWT_SECRET = JWT_SECRET;
@@ -42,14 +47,11 @@ describe('Tenant Context Middleware Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     
-    // Get mock client
-    mockClient = {
-      query: jest.fn(),
-      release: jest.fn()
-    };
-    
+    // Reset mock implementations
     getClient.mockResolvedValue(mockClient);
+    healthCheck.mockResolvedValue(true);
     mockClient.query.mockResolvedValue({ rows: [], rowCount: 0 });
+    mockClient.release.mockImplementation(() => {});
   });
   
   afterAll(() => {

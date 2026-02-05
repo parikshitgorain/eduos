@@ -27,8 +27,8 @@ const { getClient } = require('../config/database');
 describe('Tenant Context Middleware', () => {
   let req, res, next;
   const JWT_SECRET = 'test-secret-key';
-  const TENANT_ID = '11111111-1111-1111-1111-111111111111';
-  const USER_ID = '22222222-2222-2222-2222-222222222222';
+  const TENANT_ID = '11111111-1111-4111-8111-111111111111';
+  const USER_ID = '22222222-2222-4222-8222-222222222222';
   
   beforeEach(() => {
     // Reset mocks
@@ -389,7 +389,7 @@ describe('Tenant Context Middleware', () => {
     });
     
     test('validateTenantAccess should return false for different tenants', () => {
-      const otherTenantId = '33333333-3333-3333-3333-333333333333';
+      const otherTenantId = '33333333-3333-4333-8333-333333333333';
       const result = validateTenantAccess(otherTenantId, TENANT_ID);
       expect(result).toBe(false);
     });
@@ -409,7 +409,7 @@ describe('Tenant Context Middleware', () => {
     });
     
     test('should block access to different tenant resource', async () => {
-      const otherTenantId = '33333333-3333-3333-3333-333333333333';
+      const otherTenantId = '33333333-3333-4333-8333-333333333333';
       const getTenantId = jest.fn().mockResolvedValue(otherTenantId);
       const guard = crossTenantGuard(getTenantId);
       
