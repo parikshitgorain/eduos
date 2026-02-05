@@ -466,23 +466,75 @@ async function getSchemaVersionHistory(tenantId, formType) {
  */
 async function verifySchemaIntegrity(snapshotId, tenantId) {
   const sql = `
-    SELECT schema_hash, schema_definition FROM schema_snapshots
-    WHERE snapshot_id = $1 AND tenant_id = $2
+    SELECT * FROM verify_schema_integrity($1)
   `;
   
-  const result = await query(sql, [snapshotId, tenantId]);
+  const result = await query(sql, [snapshotId]);
   
   if (result.rows.length === 0) {
     throw new Error(`Schema snapshot not found: ${snapshotId}`);
   }
   
-  const { schema_hash, schema_definition } = result.rows[0];
-  const computedHash = computeSchemaHash(schema_definition);
+  const verification = result.rows[0];
+  
+  // Filter by tenant_id for security
+  const snapshotCheck = await query(
+    'SELECT tenant_id FROM schema_snapshots WHERE snapshot_id = $1',
+    [snapshotId]
+  );
+  
+  if (snapshotCheck.rows.length === 0 || snapshotCheck.rows[0].tenant_id !== tenantId) {
+    throw new Error(`Schema snapshot not found or access denied: ${snapshotId}`);
+  }
+  
+  return verification;
+}
+
+/**
+ * Verify integrity of all snapshots for a tenant
+ */
+async function verifyAllSnapshotsForTenant(tenantId) {
+  const sql = `
+    SELECT 
+      snapshot_id,
+      semantic_version,
+      schema_hash,
+      schema_definition,
+      created_at
+    FROM schema_snapshots
+    WHERE tenant_id = $1
+    ORDER BY created_at ASC
+  `;
+  
+  const result = await query(sql, [tenantId]);
+  const snapshots = result.rows;
+  
+  const verificationResults = [];
+  let failedCount = 0;
+  
+  for (const snapshot of snapshots) {
+    const computedHash = computeSchemaHash(snapshot.schema_definition);
+    const isValid = snapshot.schema_hash === computedHash;
+    
+    if (!isValid) {
+      failedCount++;
+    }
+    
+    verificationResults.push({
+      snapshot_id: snapshot.snapshot_id,
+      semantic_version: snapshot.semantic_version,
+      is_valid: isValid,
+      stored_hash: snapshot.schema_hash,
+      computed_hash: computedHash,
+      created_at: snapshot.created_at
+    });
+  }
   
   return {
-    is_valid: schema_hash === computedHash,
-    stored_hash: schema_hash,
-    computed_hash: computedHash
+    total_checked: snapshots.length,
+    failed_count: failedCount,
+    success_rate: snapshots.length > 0 ? ((snapshots.length - failedCount) / snapshots.length * 100) : 100,
+    results: verificationResults
   };
 }
 
@@ -674,6 +726,7 @@ module.exports = {
   listSchemaSnapshots,
   getSchemaVersionHistory,
   verifySchemaIntegrity,
+  verifyAllSnapshotsForTenant,
   exportSchema,
   importSchema,
   updateSchemaStatus,

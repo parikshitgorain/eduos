@@ -300,4 +300,27 @@ router.get('/field-types', (req, res) => {
   });
 });
 
+/**
+ * POST /api/v1/schemas/integrity/check
+ * Run integrity check on all tenant schemas
+ */
+router.post('/integrity/check', async (req, res) => {
+  try {
+    const tenantId = req.user.tenant_id;
+    
+    const result = await schemaService.verifyAllSnapshotsForTenant(tenantId);
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error running integrity check:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
