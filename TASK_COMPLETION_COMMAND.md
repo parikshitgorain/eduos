@@ -17,9 +17,10 @@ VERIFICATION:
 DOCUMENTATION:
 1. Create implementation summary ✅
 2. Create verification report (if complex) ✅
-3. Update README.md ✅
+3. Update README.md (root) ✅
 4. Update docs/README.md ✅
 5. Update docs/PROJECT_STATUS.md ✅
+6. Update database/README.md (if database changes) ✅
 
 GIT:
 1. git add . ✅
@@ -36,7 +37,7 @@ Task: [TASK_NUMBER] - [TASK_NAME]
 
 ```
 Finalize task [X.X.X]:
-1. Tests → 2. Summary → 3. READMEs → 4. Commit → 5. Push → 6. Verify GitHub
+1. Tests → 2. Summary → 3. Update 3 READMEs (root, docs, database if needed) → 4. Commit → 5. Push → 6. Verify GitHub
 ```
 
 ---
@@ -54,11 +55,12 @@ VERIFICATION:
 3. Check code coverage > 80% ✅
 
 DOCUMENTATION:
-1. Create docs/tasks/TASK_1.3.1_IMPLEMENTATION_SUMMARY.md ✅
+1. Create docs/tasks/TASK_[X.X.X]_IMPLEMENTATION_SUMMARY.md ✅
 2. Create docs/AUTH_SERVICE.md ✅
-3. Update README.md ✅
+3. Update README.md (root) ✅
 4. Update docs/README.md ✅
 5. Update docs/PROJECT_STATUS.md ✅
+6. Update database/README.md (if database changes) ✅
 
 GIT:
 1. git add . ✅
@@ -77,7 +79,7 @@ Before saying "task complete":
 
 - [ ] All tests passing
 - [ ] Implementation summary created
-- [ ] All READMEs updated (3 files)
+- [ ] All READMEs updated (3 files: root, docs, database if needed)
 - [ ] Committed to git
 - [ ] Pushed to GitHub
 - [ ] Verified on GitHub web
@@ -90,10 +92,14 @@ Before saying "task complete":
 - `docs/tasks/TASK_[X.X.X]_IMPLEMENTATION_SUMMARY.md`
 
 **Always Update:**
-- `README.md`
-- `docs/README.md`
-- `docs/PROJECT_STATUS.md`
-- `.kiro/specs/eduos-platform/tasks.md`
+- `README.md` (root - project overview)
+- `docs/README.md` (documentation index)
+- `docs/PROJECT_STATUS.md` (progress tracking)
+- `.kiro/specs/eduos-platform/tasks.md` (task status)
+
+**Update If Applicable:**
+- `database/README.md` (if database schema changes)
+- `docs/[FEATURE_NAME].md` (if new feature documentation needed)
 
 ---
 
