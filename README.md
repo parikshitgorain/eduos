@@ -429,7 +429,16 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 - ✅ API endpoint for manual integrity checks
 - ✅ 17 unit tests passing (100%)
 
-- [ ] Task 2.2.3: Field-level permission system
+#### ✅ Task 2.2.3: Field-Level Permission System - COMPLETED
+- ✅ Field permissions: visible_to_roles, editable_by_roles
+- ✅ Permission inheritance hierarchy (Global → Batch)
+- ✅ Permission resolution algorithm (set intersection)
+- ✅ Preview-as-role functionality for admins
+- ✅ API: POST `/api/v1/schemas/:id/preview` returns role-specific view
+- ✅ Bulk permission updates
+- ✅ Permission hierarchy validation
+- ✅ 56 unit tests passing (35 service + 21 routes)
+
 - [ ] Task 2.2.4: Schema migration engine with dry-run mode
 - [ ] Task 2.2.5: Historic rendering with snapshot association
 - [ ] Offline-first attendance
@@ -565,6 +574,6 @@ Built with:
 
 ---
 
-**Project Status:** Phase 1 Complete ✅ | Phase 2 In Progress (5/14 tasks)  
-**Next Milestone:** Task 2.2.3 - Field-Level Permission System  
+**Project Status:** Phase 1 Complete ✅ | Phase 2 In Progress (6/14 tasks)  
+**Next Milestone:** Task 2.2.4 - Schema Migration Engine with Dry-Run Mode  
 **Last Updated:** 2026-02-05

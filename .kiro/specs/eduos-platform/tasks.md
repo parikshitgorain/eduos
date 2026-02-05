@@ -156,7 +156,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - Cryptographic integrity check runs nightly
     - Append-only table constraint prevents updates/deletes
 
-- [ ] 2.2.3 Create field-level permission system
+- [x] 2.2.3 Create field-level permission system
   - **Definition of Done:**
     - Each field has: visible_to_roles, editable_by_roles
     - Permission inheritance follows hierarchy (Global → Batch)

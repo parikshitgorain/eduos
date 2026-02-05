@@ -130,6 +130,14 @@ app.use('/api/v1/domains', domainRoutes);
 // Enrollment management routes (require tenant context)
 const enrollmentRoutes = require('./routes/enrollments');
 app.use('/api/v1/enrollments', enrollmentRoutes);
+
+// Schema management routes (require tenant context)
+const schemaRoutes = require('./routes/schemas');
+app.use('/api/v1/schemas', schemaRoutes);
+
+// Field permissions routes (require tenant context)
+const fieldPermissionsRoutes = require('./routes/fieldPermissions');
+app.use('/api/v1', fieldPermissionsRoutes);
 app.get('/api/students', async (req, res) => {
   // RLS automatically filters by tenant_id
   const result = await req.dbClient.query(

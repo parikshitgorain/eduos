@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-02-05  
 **Current Phase:** Phase 2 - Core Domain & Hierarchy  
-**Status:** Phase 1 Complete ✅ | Phase 2 In Progress (5/14 tasks)
+**Status:** Phase 1 Complete ✅ | Phase 2 In Progress (6/14 tasks)
 
 ---
 
@@ -116,7 +116,7 @@
 
 ### Phase 2: Core Domain & Hierarchy (Weeks 5-8)
 
-**Progress:** 5/14 tasks complete (36%)
+**Progress:** 6/14 tasks complete (43%)
 
 #### ✅ Completed Tasks
 
@@ -174,9 +174,20 @@
    - 16 unit tests passing
    - [Implementation Summary](tasks/TASK_2.2.2_IMPLEMENTATION_SUMMARY.md)
 
+6. **Task 2.2.3: Field-Level Permission System** - COMPLETE ✅
+   - Field permissions: visible_to_roles, editable_by_roles
+   - Permission inheritance hierarchy (Global → Batch)
+   - Permission resolution algorithm (set intersection)
+   - Preview-as-role functionality for admins
+   - API: POST `/api/v1/schemas/:id/preview` returns role-specific view
+   - Bulk permission updates and validation
+   - 56 unit tests passing (35 service + 21 routes)
+   - [Implementation Summary](tasks/TASK_2.2.3_IMPLEMENTATION_SUMMARY.md)
+   - [Documentation](FIELD_PERMISSIONS.md)
+
 #### 🔄 Next Tasks
 
-6. **Task 2.2.3: Field-Level Permission System** - NOT STARTED
+7. **Task 2.2.4: Schema Migration Engine with Dry-Run Mode** - NOT STARTED
 
 ---
 
@@ -186,7 +197,7 @@
 **Status:** 13/13 tasks complete (100%) 🎉
 
 **Next Milestone:** Phase 2 - Core Domain & Hierarchy  
-**Status:** 4/14 tasks complete (29%)
+**Status:** 6/14 tasks complete (43%)
 
 ---
 
