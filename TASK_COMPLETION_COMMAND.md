@@ -11,7 +11,7 @@ Complete and finalize task [TASK_NUMBER]:
 
 VERIFICATION:
 1. Run all tests (npm test) ✅
-2. Verify all acceptance criteria met ✅
+2. Verify all acceptance criteria met with design.md ✅
 3. Check code coverage > 80% ✅
 
 DOCUMENTATION:
