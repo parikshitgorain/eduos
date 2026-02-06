@@ -12,6 +12,7 @@ module.exports = {
     'src/**/*.js',
     '!src/**/*.test.js',
     '!src/server.js',
+    '!src/utils/generateToken.js', // Exclude CLI code
   ],
   transformIgnorePatterns: [
     'node_modules/(?!(openid-client|oauth4webapi)/)',

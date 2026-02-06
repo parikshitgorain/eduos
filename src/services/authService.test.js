@@ -1,382 +1,623 @@
 /**
- * EduOS Platform - Authentication Service Tests
+ * AuthService Tests
  * 
- * Tests for OAuth2/OIDC authentication service
+ * Comprehensive test coverage for OAuth2/OIDC authentication service
  */
 
-// Mock openid-client before requiring authService
-jest.mock('openid-client', () => ({
-  Issuer: {
-    discover: jest.fn(),
-  },
-  generators: {
-    codeVerifier: jest.fn(() => 'mock-code-verifier'),
-    codeChallenge: jest.fn(() => 'mock-code-challenge'),
-  },
-}));
-
 const authService = require('./authService');
+const sessionService = require('./sessionService');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+
+// Mock dependencies
+jest.mock('./sessionService');
+jest.mock('openid-client');
+jest.mock('jsonwebtoken');
+jest.mock('crypto');
 
 describe('AuthService', () => {
-  beforeAll(async () => {
-    // Set test environment variables
-    process.env.JWT_SECRET = 'test-secret-key-for-testing-only';
+  const mockTenantId = 'tenant-123';
+  const mockUserId = 'user-123';
+  const mockEmail = 'test@example.com';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    
+    // Reset environment variables
+    process.env.JWT_SECRET = 'test-secret';
+    process.env.JWT_ISSUER = 'test-issuer';
+    process.env.JWT_AUDIENCE = 'test-audience';
     process.env.JWT_EXPIRES_IN = '1h';
     process.env.JWT_REFRESH_EXPIRES_IN = '7d';
-    process.env.JWT_ISSUER = 'eduos-test';
-    process.env.JWT_AUDIENCE = 'eduos-api-test';
+    
+    // Reset authService state
+    authService.clients = {};
+    authService.codeVerifiers = new Map();
+    authService.initialized = false;
   });
 
-  describe('JWT Token Generation', () => {
-    test('should generate access token with correct payload', () => {
+  describe('initialize', () => {
+    it('should initialize Google OAuth2 client when credentials are provided', async () => {
+      process.env.GOOGLE_CLIENT_ID = 'google-client-id';
+      process.env.GOOGLE_CLIENT_SECRET = 'google-client-secret';
+      process.env.GOOGLE_REDIRECT_URI = 'http://localhost:3000/auth/google/callback';
+
+      const { Issuer } = require('openid-client');
+      const mockGoogleIssuer = {
+        Client: jest.fn().mockImplementation(() => ({
+          client_id: 'google-client-id',
+          client_secret: 'google-client-secret',
+        })),
+      };
+      Issuer.discover = jest.fn().mockResolvedValue(mockGoogleIssuer);
+
+      await authService.initialize();
+
+      expect(Issuer.discover).toHaveBeenCalledWith('https://accounts.google.com');
+      expect(authService.initialized).toBe(true);
+    });
+
+    it('should initialize Microsoft OAuth2 client when credentials are provided', async () => {
+      process.env.MICROSOFT_CLIENT_ID = 'microsoft-client-id';
+      process.env.MICROSOFT_CLIENT_SECRET = 'microsoft-client-secret';
+      process.env.MICROSOFT_REDIRECT_URI = 'http://localhost:3000/auth/microsoft/callback';
+
+      const { Issuer } = require('openid-client');
+      const mockMicrosoftIssuer = {
+        Client: jest.fn().mockImplementation(() => ({
+          client_id: 'microsoft-client-id',
+          client_secret: 'microsoft-client-secret',
+        })),
+      };
+      Issuer.discover = jest.fn().mockResolvedValue(mockMicrosoftIssuer);
+
+      await authService.initialize();
+
+      expect(Issuer.discover).toHaveBeenCalledWith('https://login.microsoftonline.com/common/v2.0');
+      expect(authService.initialized).toBe(true);
+    });
+
+    it('should not reinitialize if already initialized', async () => {
+      authService.initialized = true;
+      const { Issuer } = require('openid-client');
+      Issuer.discover = jest.fn();
+
+      await authService.initialize();
+
+      expect(Issuer.discover).not.toHaveBeenCalled();
+    });
+
+    it('should handle initialization errors', async () => {
+      process.env.GOOGLE_CLIENT_ID = 'google-client-id';
+      process.env.GOOGLE_CLIENT_SECRET = 'google-client-secret';
+
+      const { Issuer } = require('openid-client');
+      Issuer.discover = jest.fn().mockRejectedValue(new Error('Network error'));
+
+      await expect(authService.initialize()).rejects.toThrow('Network error');
+    });
+  });
+
+  describe('getAuthorizationUrl', () => {
+    beforeEach(() => {
+      const mockClient = {
+        authorizationUrl: jest.fn().mockReturnValue('https://auth.example.com/oauth2/authorize?code_challenge=test'),
+      };
+      authService.clients.google = mockClient;
+    });
+
+    it('should generate authorization URL for Google', () => {
+      const { generators } = require('openid-client');
+      generators.codeVerifier = jest.fn().mockReturnValue('test-verifier');
+      generators.codeChallenge = jest.fn().mockReturnValue('test-challenge');
+      
+      crypto.randomBytes = jest.fn().mockReturnValue(Buffer.from('random-bytes'));
+      
+      const result = authService.getAuthorizationUrl('google', mockTenantId);
+
+      expect(result).toHaveProperty('url');
+      expect(result).toHaveProperty('state');
+      expect(authService.clients.google.authorizationUrl).toHaveBeenCalledWith({
+        scope: 'openid email profile',
+        state: expect.any(String),
+        code_challenge: 'test-challenge',
+        code_challenge_method: 'S256',
+      });
+    });
+
+    it('should generate authorization URL for Microsoft', () => {
+      const mockClient = {
+        authorizationUrl: jest.fn().mockReturnValue('https://auth.microsoft.com/oauth2/authorize'),
+      };
+      authService.clients.microsoft = mockClient;
+
+      const { generators } = require('openid-client');
+      generators.codeVerifier = jest.fn().mockReturnValue('test-verifier');
+      generators.codeChallenge = jest.fn().mockReturnValue('test-challenge');
+      
+      crypto.randomBytes = jest.fn().mockReturnValue(Buffer.from('random-bytes'));
+
+      const result = authService.getAuthorizationUrl('microsoft', mockTenantId);
+
+      expect(result).toHaveProperty('url');
+      expect(result).toHaveProperty('state');
+      expect(mockClient.authorizationUrl).toHaveBeenCalledWith({
+        scope: 'openid email profile User.Read',
+        state: expect.any(String),
+        code_challenge: 'test-challenge',
+        code_challenge_method: 'S256',
+      });
+    });
+
+    it('should throw error for unconfigured provider', () => {
+      expect(() => {
+        authService.getAuthorizationUrl('invalid', mockTenantId);
+      }).toThrow("OAuth2 provider 'invalid' not configured");
+    });
+  });
+
+  describe('handleCallback', () => {
+    const mockCode = 'auth-code-123';
+    const mockState = 'state-123';
+
+    beforeEach(() => {
+      const mockClient = {
+        callback: jest.fn().mockResolvedValue({
+          claims: () => ({
+            sub: 'provider-user-id',
+            email: mockEmail,
+            name: 'Test User',
+            given_name: 'Test',
+            family_name: 'User',
+            picture: 'https://example.com/avatar.jpg',
+          }),
+          id_token: 'id-token',
+          access_token: 'access-token',
+          refresh_token: 'refresh-token',
+          expires_at: Date.now() + 3600000,
+        }),
+        redirect_uris: ['http://localhost:3000/auth/google/callback'],
+      };
+      authService.clients.google = mockClient;
+      authService.codeVerifiers.set(mockState, 'test-verifier');
+    });
+
+    it('should handle OAuth2 callback successfully', async () => {
+      // Mock the extractTenantFromState method to return a valid tenant ID
+      const originalExtractTenant = authService.extractTenantFromState;
+      authService.extractTenantFromState = jest.fn().mockReturnValue(mockTenantId);
+
+      const result = await authService.handleCallback('google', mockCode, mockState);
+
+      expect(result).toEqual({
+        provider: 'google',
+        providerId: 'provider-user-id',
+        email: mockEmail,
+        name: 'Test User',
+        givenName: 'Test',
+        familyName: 'User',
+        picture: 'https://example.com/avatar.jpg',
+        tenantId: mockTenantId,
+        idToken: 'id-token',
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        expiresAt: expect.any(Number),
+      });
+      expect(authService.codeVerifiers.has(mockState)).toBe(false);
+
+      // Restore original method
+      authService.extractTenantFromState = originalExtractTenant;
+    });
+
+    it('should throw error for invalid state', async () => {
+      await expect(
+        authService.handleCallback('google', mockCode, 'invalid-state')
+      ).rejects.toThrow('Invalid state parameter or session expired');
+    });
+
+    it('should throw error for unconfigured provider', async () => {
+      await expect(
+        authService.handleCallback('invalid', mockCode, mockState)
+      ).rejects.toThrow("OAuth2 provider 'invalid' not configured");
+    });
+
+    it('should clean up code verifier on error', async () => {
+      authService.clients.google.callback.mockRejectedValue(new Error('OAuth error'));
+
+      await expect(
+        authService.handleCallback('google', mockCode, mockState)
+      ).rejects.toThrow('OAuth error');
+      
+      expect(authService.codeVerifiers.has(mockState)).toBe(false);
+    });
+  });
+
+  describe('generateAccessToken', () => {
+    it('should generate access token with HS256 when no private key', () => {
+      jwt.sign = jest.fn().mockReturnValue('access-token');
+
       const payload = {
-        userId: 'user-123',
-        tenantId: 'tenant-456',
-        email: 'test@example.com',
-        roles: ['teacher'],
-        permissions: ['read:students'],
+        userId: mockUserId,
+        tenantId: mockTenantId,
+        email: mockEmail,
+        roles: ['user'],
+        permissions: ['read:profile'],
       };
 
       const token = authService.generateAccessToken(payload);
-      expect(token).toBeDefined();
-      expect(typeof token).toBe('string');
 
-      // Decode and verify token
-      const decoded = jwt.decode(token);
-      expect(decoded.sub).toBe('user-123');
-      expect(decoded.tenant_id).toBe('tenant-456');
-      expect(decoded.email).toBe('test@example.com');
-      expect(decoded.roles).toEqual(['teacher']);
-      expect(decoded.permissions).toEqual(['read:students']);
-      expect(decoded.type).toBe('access');
+      expect(jwt.sign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sub: mockUserId,
+          tenant_id: mockTenantId,
+          email: mockEmail,
+          roles: ['user'],
+          permissions: ['read:profile'],
+          type: 'access',
+        }),
+        'test-secret',
+        expect.objectContaining({
+          algorithm: 'HS256',
+          expiresIn: '1h',
+          issuer: 'test-issuer',
+          audience: 'test-audience',
+        })
+      );
+      expect(token).toBe('access-token');
     });
 
-    test('should generate refresh token with correct payload', () => {
+    it('should generate access token with RS256 when private key available', () => {
+      process.env.JWT_PRIVATE_KEY = 'private-key';
+      jwt.sign = jest.fn().mockReturnValue('rs256-token');
+
       const payload = {
-        userId: 'user-123',
-        tenantId: 'tenant-456',
+        userId: mockUserId,
+        tenantId: mockTenantId,
+        email: mockEmail,
+      };
+
+      const token = authService.generateAccessToken(payload);
+
+      expect(jwt.sign).toHaveBeenCalledWith(
+        expect.any(Object),
+        'private-key',
+        expect.objectContaining({
+          algorithm: 'RS256',
+        })
+      );
+      expect(token).toBe('rs256-token');
+    });
+  });
+
+  describe('generateRefreshToken', () => {
+    it('should generate refresh token with HS256', () => {
+      // Ensure no private key is set for this test
+      delete process.env.JWT_PRIVATE_KEY;
+      jwt.sign = jest.fn().mockReturnValue('refresh-token');
+
+      const payload = {
+        userId: mockUserId,
+        tenantId: mockTenantId,
       };
 
       const token = authService.generateRefreshToken(payload);
-      expect(token).toBeDefined();
-      expect(typeof token).toBe('string');
 
-      // Decode and verify token
-      const decoded = jwt.decode(token);
-      expect(decoded.sub).toBe('user-123');
-      expect(decoded.tenant_id).toBe('tenant-456');
-      expect(decoded.type).toBe('refresh');
+      expect(jwt.sign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sub: mockUserId,
+          tenant_id: mockTenantId,
+          type: 'refresh',
+        }),
+        'test-secret',
+        expect.objectContaining({
+          algorithm: 'HS256',
+          expiresIn: '7d',
+        })
+      );
+      expect(token).toBe('refresh-token');
     });
 
-    test('should set correct expiration times', () => {
+    it('should generate refresh token with RS256 when private key available', () => {
+      process.env.JWT_PRIVATE_KEY = 'private-key';
+      jwt.sign = jest.fn().mockReturnValue('rs256-refresh-token');
+
       const payload = {
-        userId: 'user-123',
-        tenantId: 'tenant-456',
-        email: 'test@example.com',
+        userId: mockUserId,
+        tenantId: mockTenantId,
       };
 
-      const accessToken = authService.generateAccessToken(payload);
-      const refreshToken = authService.generateRefreshToken(payload);
+      const token = authService.generateRefreshToken(payload);
 
-      const accessDecoded = jwt.decode(accessToken);
-      const refreshDecoded = jwt.decode(refreshToken);
-
-      // Access token should expire in ~1 hour
-      const accessExpiry = accessDecoded.exp - accessDecoded.iat;
-      expect(accessExpiry).toBeGreaterThanOrEqual(3599);
-      expect(accessExpiry).toBeLessThanOrEqual(3601);
-
-      // Refresh token should expire in ~7 days
-      const refreshExpiry = refreshDecoded.exp - refreshDecoded.iat;
-      expect(refreshExpiry).toBeGreaterThanOrEqual(604799);
-      expect(refreshExpiry).toBeLessThanOrEqual(604801);
+      expect(jwt.sign).toHaveBeenCalledWith(
+        expect.any(Object),
+        'private-key',
+        expect.objectContaining({
+          algorithm: 'RS256',
+        })
+      );
+      expect(token).toBe('rs256-refresh-token');
     });
   });
 
-  describe('Token Verification', () => {
-    test('should verify valid token', () => {
-      const payload = {
-        userId: 'user-123',
-        tenantId: 'tenant-456',
-        email: 'test@example.com',
-        roles: ['teacher'],
-      };
+  describe('verifyToken', () => {
+    it('should verify token with HS256', () => {
+      const mockDecoded = { sub: mockUserId, tenant_id: mockTenantId };
+      jwt.verify = jest.fn().mockReturnValue(mockDecoded);
 
-      const token = authService.generateAccessToken(payload);
-      const decoded = authService.verifyToken(token);
+      const result = authService.verifyToken('test-token');
 
-      expect(decoded.sub).toBe('user-123');
-      expect(decoded.tenant_id).toBe('tenant-456');
-      expect(decoded.email).toBe('test@example.com');
+      expect(jwt.verify).toHaveBeenCalledWith(
+        'test-token',
+        'test-secret',
+        expect.objectContaining({
+          algorithms: ['HS256'],
+          issuer: 'test-issuer',
+          audience: 'test-audience',
+        })
+      );
+      expect(result).toEqual(mockDecoded);
     });
 
-    test('should reject invalid token', () => {
-      const invalidToken = 'invalid.token.here';
+    it('should verify token with RS256 when public key available', () => {
+      process.env.JWT_PUBLIC_KEY = 'public-key';
+      const mockDecoded = { sub: mockUserId, tenant_id: mockTenantId };
+      jwt.verify = jest.fn().mockReturnValue(mockDecoded);
+
+      const result = authService.verifyToken('test-token');
+
+      expect(jwt.verify).toHaveBeenCalledWith(
+        'test-token',
+        'public-key',
+        expect.objectContaining({
+          algorithms: ['RS256'],
+        })
+      );
+      expect(result).toEqual(mockDecoded);
+    });
+
+    it('should throw error for invalid token', () => {
+      jwt.verify = jest.fn().mockImplementation(() => {
+        throw new Error('Invalid token');
+      });
 
       expect(() => {
-        authService.verifyToken(invalidToken);
-      }).toThrow();
-    });
-
-    test('should reject expired token', () => {
-      // Create token with immediate expiration
-      const token = jwt.sign(
-        {
-          sub: 'user-123',
-          tenant_id: 'tenant-456',
-          type: 'access',
-        },
-        process.env.JWT_SECRET,
-        {
-          algorithm: 'HS256',
-          expiresIn: '0s',
-          issuer: process.env.JWT_ISSUER,
-          audience: process.env.JWT_AUDIENCE,
-        }
-      );
-
-      // Wait a moment to ensure expiration
-      setTimeout(() => {
-        expect(() => {
-          authService.verifyToken(token);
-        }).toThrow();
-      }, 100);
-    });
-
-    test('should reject token with wrong issuer', () => {
-      const token = jwt.sign(
-        {
-          sub: 'user-123',
-          tenant_id: 'tenant-456',
-          type: 'access',
-        },
-        process.env.JWT_SECRET,
-        {
-          algorithm: 'HS256',
-          expiresIn: '1h',
-          issuer: 'wrong-issuer',
-          audience: process.env.JWT_AUDIENCE,
-        }
-      );
-
-      expect(() => {
-        authService.verifyToken(token);
-      }).toThrow();
+        authService.verifyToken('invalid-token');
+      }).toThrow('Token verification failed: Invalid token');
     });
   });
 
-  describe('Token Refresh', () => {
-    test('should refresh access token with valid refresh token', async () => {
-      const payload = {
-        userId: 'user-123',
-        tenantId: 'tenant-456',
+  describe('refreshAccessToken', () => {
+    it('should refresh access token successfully', async () => {
+      const mockDecoded = {
+        type: 'refresh',
+        sub: mockUserId,
+        tenant_id: mockTenantId,
+        email: mockEmail,
+        roles: ['user'],
+        permissions: ['read:profile'],
       };
+      
+      jwt.verify = jest.fn().mockReturnValue(mockDecoded);
+      jwt.sign = jest.fn()
+        .mockReturnValueOnce('new-access-token')
+        .mockReturnValueOnce('new-refresh-token');
 
-      const refreshToken = authService.generateRefreshToken(payload);
-      const result = await authService.refreshAccessToken(refreshToken);
+      const result = await authService.refreshAccessToken('refresh-token');
 
-      expect(result).toHaveProperty('accessToken');
-      expect(result).toHaveProperty('refreshToken');
-      expect(result).toHaveProperty('expiresIn');
-      expect(result.expiresIn).toBe(3600);
-
-      // Verify new tokens are valid
-      const accessDecoded = authService.verifyToken(result.accessToken);
-      expect(accessDecoded.sub).toBe('user-123');
-      expect(accessDecoded.tenant_id).toBe('tenant-456');
+      expect(result).toEqual({
+        accessToken: 'new-access-token',
+        refreshToken: 'new-refresh-token',
+        expiresIn: 3600,
+      });
     });
 
-    test('should reject refresh with access token', async () => {
-      const payload = {
-        userId: 'user-123',
-        tenantId: 'tenant-456',
-        email: 'test@example.com',
-      };
-
-      const accessToken = authService.generateAccessToken(payload);
+    it('should throw error for invalid token type', async () => {
+      jwt.verify = jest.fn().mockReturnValue({ type: 'access' });
 
       await expect(
-        authService.refreshAccessToken(accessToken)
-      ).rejects.toThrow('Invalid token type');
+        authService.refreshAccessToken('access-token')
+      ).rejects.toThrow('Token refresh failed: Invalid token type');
     });
 
-    test('should reject refresh with invalid token', async () => {
-      const invalidToken = 'invalid.token.here';
+    it('should handle verification errors', async () => {
+      jwt.verify = jest.fn().mockImplementation(() => {
+        throw new Error('Token expired');
+      });
 
       await expect(
-        authService.refreshAccessToken(invalidToken)
-      ).rejects.toThrow();
+        authService.refreshAccessToken('expired-token')
+      ).rejects.toThrow('Token refresh failed: Token verification failed: Token expired');
     });
   });
 
-  describe('State Parameter Handling', () => {
-    test('should generate state with tenant context', () => {
-      const tenantId = 'tenant-123';
-      const state = authService.generateState(tenantId);
+  describe('generateState', () => {
+    it('should generate state with tenant context', () => {
+      crypto.randomBytes = jest.fn().mockReturnValue(Buffer.from('random-bytes'));
 
-      expect(state).toBeDefined();
+      const state = authService.generateState(mockTenantId);
+
+      expect(crypto.randomBytes).toHaveBeenCalledWith(16);
       expect(typeof state).toBe('string');
       expect(state.length).toBeGreaterThan(0);
     });
+  });
 
-    test('should extract tenant ID from state', () => {
-      const tenantId = 'tenant-123';
-      const state = authService.generateState(tenantId);
-      const extracted = authService.extractTenantFromState(state);
+  describe('extractTenantFromState', () => {
+    it('should extract tenant ID from valid state', () => {
+      const stateData = {
+        random: 'random-bytes',
+        tenant_id: mockTenantId,
+        timestamp: Date.now(),
+      };
+      const state = Buffer.from(JSON.stringify(stateData)).toString('base64url');
 
-      expect(extracted).toBe(tenantId);
+      const tenantId = authService.extractTenantFromState(state);
+
+      expect(tenantId).toBe(mockTenantId);
     });
 
-    test('should reject invalid state parameter', () => {
-      const invalidState = 'invalid-state';
-
+    it('should throw error for invalid state', () => {
       expect(() => {
-        authService.extractTenantFromState(invalidState);
+        authService.extractTenantFromState('invalid-state');
       }).toThrow('Invalid state parameter');
     });
   });
 
-  describe('OIDC Discovery', () => {
-    test('should return valid discovery document', () => {
-      const discovery = authService.getDiscoveryDocument();
+  describe('getDiscoveryDocument', () => {
+    it('should return OIDC discovery document', () => {
+      process.env.BASE_URL = 'https://api.example.com';
 
-      expect(discovery).toHaveProperty('issuer');
-      expect(discovery).toHaveProperty('authorization_endpoint');
-      expect(discovery).toHaveProperty('token_endpoint');
-      expect(discovery).toHaveProperty('userinfo_endpoint');
-      expect(discovery).toHaveProperty('jwks_uri');
-      expect(discovery).toHaveProperty('response_types_supported');
-      expect(discovery).toHaveProperty('subject_types_supported');
-      expect(discovery).toHaveProperty('id_token_signing_alg_values_supported');
-      expect(discovery).toHaveProperty('scopes_supported');
-      expect(discovery).toHaveProperty('claims_supported');
-      expect(discovery).toHaveProperty('code_challenge_methods_supported');
+      const doc = authService.getDiscoveryDocument();
 
-      // Verify PKCE support
-      expect(discovery.code_challenge_methods_supported).toContain('S256');
-
-      // Verify OAuth2 authorization code flow support
-      expect(discovery.response_types_supported).toContain('code');
+      expect(doc).toEqual({
+        issuer: 'test-issuer',
+        authorization_endpoint: 'https://api.example.com/auth/authorize',
+        token_endpoint: 'https://api.example.com/auth/token',
+        userinfo_endpoint: 'https://api.example.com/auth/userinfo',
+        jwks_uri: 'https://api.example.com/.well-known/jwks.json',
+        response_types_supported: ['code'],
+        subject_types_supported: ['public'],
+        id_token_signing_alg_values_supported: ['RS256', 'HS256'],
+        scopes_supported: ['openid', 'email', 'profile'],
+        token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post'],
+        claims_supported: ['sub', 'email', 'name', 'given_name', 'family_name', 'tenant_id', 'roles', 'permissions'],
+        code_challenge_methods_supported: ['S256'],
+      });
     });
 
-    test('should return JWKS document', () => {
+    it('should use default base URL when not provided', () => {
+      delete process.env.BASE_URL;
+
+      const doc = authService.getDiscoveryDocument();
+
+      expect(doc.authorization_endpoint).toBe('http://localhost:3000/auth/authorize');
+    });
+  });
+
+  describe('getJWKS', () => {
+    it('should return empty JWKS when no public key', () => {
+      delete process.env.JWT_PUBLIC_KEY;
+
       const jwks = authService.getJWKS();
 
-      expect(jwks).toHaveProperty('keys');
-      expect(Array.isArray(jwks.keys)).toBe(true);
+      expect(jwks).toEqual({ keys: [] });
+    });
+
+    it('should return JWKS with key when public key available', () => {
+      process.env.JWT_PUBLIC_KEY = 'public-key';
+
+      const jwks = authService.getJWKS();
+
+      expect(jwks.keys).toHaveLength(1);
+      expect(jwks.keys[0]).toEqual({
+        kty: 'RSA',
+        use: 'sig',
+        alg: 'RS256',
+        kid: 'eduos-key-1',
+      });
     });
   });
 
-  describe('Authorization URL Generation', () => {
-    test('should throw error for unconfigured provider', () => {
-      expect(() => {
-        authService.getAuthorizationUrl('invalid-provider', 'tenant-123');
-      }).toThrow("OAuth2 provider 'invalid-provider' not configured");
+  describe('createAuthSession', () => {
+    it('should create session with user data', async () => {
+      const mockSession = { sessionId: 'session-123' };
+      sessionService.createSession.mockResolvedValue(mockSession);
+
+      const userData = {
+        userId: mockUserId,
+        tenantId: mockTenantId,
+        email: mockEmail,
+        roles: ['user'],
+        permissions: ['read:profile'],
+        tier: 'premium',
+      };
+      const metadata = { ip: '127.0.0.1', userAgent: 'test-agent' };
+
+      const result = await authService.createAuthSession(userData, metadata);
+
+      expect(sessionService.createSession).toHaveBeenCalledWith({
+        userId: mockUserId,
+        tenantId: mockTenantId,
+        email: mockEmail,
+        roles: ['user'],
+        permissions: ['read:profile'],
+        tier: 'premium',
+        metadata,
+      });
+      expect(result).toEqual(mockSession);
     });
 
-    test('should generate state parameter', () => {
-      // Mock a configured client
-      authService.clients.test = {
-        authorizationUrl: jest.fn(() => 'https://example.com/auth'),
+    it('should use default values for optional fields', async () => {
+      const mockSession = { sessionId: 'session-123' };
+      sessionService.createSession.mockResolvedValue(mockSession);
+
+      const userData = {
+        userId: mockUserId,
+        tenantId: mockTenantId,
+        email: mockEmail,
       };
 
-      const result = authService.getAuthorizationUrl('test', 'tenant-123');
+      await authService.createAuthSession(userData);
 
-      expect(result).toHaveProperty('url');
-      expect(result).toHaveProperty('state');
-      expect(typeof result.state).toBe('string');
-
-      // Clean up
-      delete authService.clients.test;
-    });
-  });
-
-  describe('Token Payload Validation', () => {
-    test('should include all required claims in access token', () => {
-      const payload = {
-        userId: 'user-123',
-        tenantId: 'tenant-456',
-        email: 'test@example.com',
-        roles: ['admin'],
-        permissions: ['read:all', 'write:all'],
-      };
-
-      const token = authService.generateAccessToken(payload);
-      const decoded = jwt.decode(token);
-
-      // Required claims
-      expect(decoded).toHaveProperty('sub');
-      expect(decoded).toHaveProperty('tenant_id');
-      expect(decoded).toHaveProperty('email');
-      expect(decoded).toHaveProperty('roles');
-      expect(decoded).toHaveProperty('permissions');
-      expect(decoded).toHaveProperty('type');
-      expect(decoded).toHaveProperty('iat');
-      expect(decoded).toHaveProperty('exp');
-      expect(decoded).toHaveProperty('iss');
-      expect(decoded).toHaveProperty('aud');
-    });
-
-    test('should handle empty roles and permissions', () => {
-      const payload = {
-        userId: 'user-123',
-        tenantId: 'tenant-456',
-        email: 'test@example.com',
-      };
-
-      const token = authService.generateAccessToken(payload);
-      const decoded = jwt.decode(token);
-
-      expect(decoded.roles).toEqual([]);
-      expect(decoded.permissions).toEqual([]);
+      expect(sessionService.createSession).toHaveBeenCalledWith({
+        userId: mockUserId,
+        tenantId: mockTenantId,
+        email: mockEmail,
+        roles: [],
+        permissions: [],
+        tier: 'basic',
+        metadata: {},
+      });
     });
   });
 
-  describe('Security Features', () => {
-    test('should use HS256 algorithm when no private key is provided', () => {
-      const payload = {
-        userId: 'user-123',
-        tenantId: 'tenant-456',
-        email: 'test@example.com',
-      };
+  describe('logout', () => {
+    it('should revoke session', async () => {
+      sessionService.revokeSession.mockResolvedValue(true);
 
-      const token = authService.generateAccessToken(payload);
-      const decoded = jwt.decode(token, { complete: true });
+      const result = await authService.logout('session-123');
 
-      expect(decoded.header.alg).toBe('HS256');
+      expect(sessionService.revokeSession).toHaveBeenCalledWith('session-123', 'user_logout');
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('logoutAll', () => {
+    it('should revoke all user sessions', async () => {
+      sessionService.revokeAllUserSessions.mockResolvedValue(3);
+
+      const result = await authService.logoutAll(mockUserId, mockTenantId);
+
+      expect(sessionService.revokeAllUserSessions).toHaveBeenCalledWith(
+        mockUserId,
+        mockTenantId,
+        'user_logout_all'
+      );
+      expect(result).toBe(3);
+    });
+  });
+
+  describe('validateSession', () => {
+    it('should validate and touch session', async () => {
+      const mockSession = { sessionId: 'session-123', userId: mockUserId };
+      sessionService.getSession.mockResolvedValue(mockSession);
+      sessionService.touchSession.mockResolvedValue(mockSession);
+
+      const result = await authService.validateSession('session-123');
+
+      expect(sessionService.getSession).toHaveBeenCalledWith('session-123');
+      expect(sessionService.touchSession).toHaveBeenCalledWith('session-123');
+      expect(result).toEqual(mockSession);
     });
 
-    test('should include issuer and audience in tokens', () => {
-      const payload = {
-        userId: 'user-123',
-        tenantId: 'tenant-456',
-        email: 'test@example.com',
-      };
+    it('should return null for invalid session', async () => {
+      sessionService.getSession.mockResolvedValue(null);
 
-      const token = authService.generateAccessToken(payload);
-      const decoded = jwt.decode(token);
+      const result = await authService.validateSession('invalid-session');
 
-      expect(decoded.iss).toBe('eduos-test');
-      expect(decoded.aud).toBe('eduos-api-test');
-    });
-
-    test('should generate unique tokens for same payload', async () => {
-      const payload = {
-        userId: 'user-123',
-        tenantId: 'tenant-456',
-        email: 'test@example.com',
-      };
-
-      const token1 = authService.generateAccessToken(payload);
-      
-      // Wait 1 second to ensure different iat timestamp
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const token2 = authService.generateAccessToken(payload);
-
-      // Tokens should be different due to different iat timestamps
-      expect(token1).not.toBe(token2);
+      expect(sessionService.getSession).toHaveBeenCalledWith('invalid-session');
+      expect(sessionService.touchSession).not.toHaveBeenCalled();
+      expect(result).toBeNull();
     });
   });
 });

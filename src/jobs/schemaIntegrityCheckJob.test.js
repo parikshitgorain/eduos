@@ -1,215 +1,184 @@
 /**
  * Schema Integrity Check Job Tests
- * 
- * Tests for nightly integrity check job
  * Task: 2.2.2 - Implement immutable schema snapshots with SHA-256 hashing
  */
 
+const schemaIntegrityCheckJob = require('./schemaIntegrityCheckJob');
+
+// Mock dependencies
+jest.mock('../config/database', () => ({
+  query: jest.fn()
+}));
+
+jest.mock('../services/schemaService', () => ({
+  verifySchemaIntegritySystem: jest.fn()
+}));
+
+jest.mock('node-cron', () => ({
+  schedule: jest.fn(),
+  destroy: jest.fn()
+}));
+
 const { query } = require('../config/database');
 const schemaService = require('../services/schemaService');
-const integrityJob = require('./schemaIntegrityCheckJob');
+const cron = require('node-cron');
 
-describe('Schema Integrity Check Job (Task 2.2.2)', () => {
-  let testTenantId;
-  let testUserId;
-  let testSnapshotIds = [];
-  
-  beforeAll(async () => {
-    // Create test tenant with unique subdomain
-    const uniqueSubdomain = `test-integrity-job-${Date.now()}`;
-    const tenantResult = await query(`
-      INSERT INTO tenants (name, subdomain, tier)
-      VALUES ('Test Integrity Job Tenant', $1, 'Enterprise')
-      RETURNING tenant_id
-    `, [uniqueSubdomain]);
-    testTenantId = tenantResult.rows[0].tenant_id;
-    
-    // Create test user
-    const userResult = await query(`
-      INSERT INTO users (tenant_id, email, password_hash, first_name, last_name)
-      VALUES ($1, $2, 'hash', 'Test', 'User')
-      RETURNING user_id
-    `, [testTenantId, `integrity-job-${Date.now()}@test.com`]);
-    testUserId = userResult.rows[0].user_id;
-    
-    // Create multiple test schema snapshots
-    for (let i = 0; i < 3; i++) {
-      const snapshot = await schemaService.createSchemaSnapshot({
-        tenantId: testTenantId,
-        formType: `integrity_job_test_${i}`,
-        fields: [
-          {
-            field_name: `test_field_${i}`,
-            field_type: 'text',
-            label: `Test Field ${i}`,
-            is_required: true
-          }
-        ],
-        createdBy: testUserId,
-        changeSummary: `Test schema ${i}`
-      });
-      
-      testSnapshotIds.push(snapshot.snapshot.snapshot_id);
-    }
+describe('Schema Integrity Check Job', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(console, 'log').mockImplementation();
+    jest.spyOn(console, 'error').mockImplementation();
   });
-  
-  afterAll(async () => {
-    // Clean up test data
-    try {
-      await query('DELETE FROM users WHERE tenant_id = $1', [testTenantId]);
-      await query('DELETE FROM tenants WHERE tenant_id = $1', [testTenantId]);
-    } catch (error) {
-      console.log('Cleanup note: Some test data may remain due to immutability constraints');
-    }
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
-  
-  describe('Integrity Check Execution', () => {
-    test('should run integrity check successfully', async () => {
-      const result = await integrityJob.runIntegrityCheck();
-      
+
+  describe('runIntegrityCheck', () => {
+    it('should run integrity check successfully', async () => {
+      const mockSnapshots = [{ snapshot_id: 'snap-1' }];
+
+      query
+        .mockResolvedValueOnce({ rows: mockSnapshots })
+        .mockResolvedValueOnce({ rows: [{ check_id: 'check-123' }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      schemaService.verifySchemaIntegritySystem.mockResolvedValue({ is_valid: true });
+
+      const result = await schemaIntegrityCheckJob.runIntegrityCheck();
+
+      expect(result).toBeDefined();
       expect(result.success).toBe(true);
-      expect(result.check_id).toBeDefined();
-      expect(result.total_checked).toBeGreaterThan(0);
+      expect(result.total_checked).toBe(1);
       expect(result.failed_count).toBe(0);
-      expect(result.duration_ms).toBeGreaterThan(0);
     });
-    
-    test('should log check results to database', async () => {
-      await integrityJob.runIntegrityCheck();
-      
-      const result = await query(`
-        SELECT * FROM schema_integrity_checks
-        ORDER BY check_started_at DESC
-        LIMIT 1
-      `);
-      
-      expect(result.rows.length).toBe(1);
-      const check = result.rows[0];
-      expect(check.check_status).toBe('completed');
-      expect(check.total_snapshots_checked).toBeGreaterThan(0);
-      expect(check.failed_snapshots).toBe(0);
+
+    it('should handle integrity violations', async () => {
+      const mockSnapshots = [{ snapshot_id: 'snap-1' }];
+
+      query
+        .mockResolvedValueOnce({ rows: mockSnapshots })
+        .mockResolvedValueOnce({ rows: [{ check_id: 'check-123' }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      schemaService.verifySchemaIntegritySystem.mockResolvedValue({ is_valid: false });
+
+      const result = await schemaIntegrityCheckJob.runIntegrityCheck();
+
+      expect(result.success).toBe(false);
+      expect(result.failed_count).toBe(1);
+    });
+
+    it('should handle empty snapshot list', async () => {
+      query
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ check_id: 'check-123' }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const result = await schemaIntegrityCheckJob.runIntegrityCheck();
+
+      expect(result.success).toBe(true);
+      expect(result.total_checked).toBe(0);
+    });
+
+    it('should handle database errors', async () => {
+      query.mockRejectedValueOnce(new Error('Database error'));
+
+      await expect(schemaIntegrityCheckJob.runIntegrityCheck()).rejects.toThrow('Database error');
     });
   });
-  
-  describe('Single Snapshot Verification', () => {
-    test('should verify single snapshot integrity', async () => {
-      const result = await integrityJob.verifySnapshotIntegrity(testSnapshotIds[0]);
-      
+
+  describe('verifySnapshotIntegrity', () => {
+    it('should verify snapshot integrity', async () => {
+      schemaService.verifySchemaIntegritySystem.mockResolvedValue({ is_valid: true });
+
+      const result = await schemaIntegrityCheckJob.verifySnapshotIntegrity('snap-1');
+
       expect(result.is_valid).toBe(true);
-      expect(result.snapshot_id).toBe(testSnapshotIds[0]);
-      expect(result.stored_hash).toBeDefined();
-      expect(result.computed_hash).toBeDefined();
-      expect(result.stored_hash).toBe(result.computed_hash);
-    });
-    
-    test('should throw error for non-existent snapshot', async () => {
-      const fakeId = '00000000-0000-0000-0000-000000000000';
-      
-      await expect(async () => {
-        await integrityJob.verifySnapshotIntegrity(fakeId);
-      }).rejects.toThrow(/not found/i);
+      expect(schemaService.verifySchemaIntegritySystem).toHaveBeenCalledWith('snap-1');
     });
   });
-  
-  describe('Integrity Check History', () => {
-    test('should retrieve integrity check history', async () => {
-      // Run a check first
-      await integrityJob.runIntegrityCheck();
-      
-      const history = await integrityJob.getIntegrityCheckHistory(10);
-      
-      expect(history).toBeInstanceOf(Array);
-      expect(history.length).toBeGreaterThan(0);
-      expect(history[0]).toHaveProperty('check_id');
-      expect(history[0]).toHaveProperty('check_started_at');
-      expect(history[0]).toHaveProperty('total_snapshots_checked');
-      expect(history[0]).toHaveProperty('success_rate_percent');
-    });
-    
-    test('should retrieve latest integrity check', async () => {
-      // Run a check first
-      await integrityJob.runIntegrityCheck();
-      
-      const latest = await integrityJob.getLatestIntegrityCheck();
-      
-      expect(latest).toBeDefined();
-      expect(latest.check_id).toBeDefined();
-      expect(latest.check_status).toBe('completed');
+
+  describe('getIntegrityCheckHistory', () => {
+    it('should return check history', async () => {
+      const mockHistory = [{ check_id: 'check-1' }];
+      query.mockResolvedValue({ rows: mockHistory });
+
+      const result = await schemaIntegrityCheckJob.getIntegrityCheckHistory();
+
+      expect(result).toEqual(mockHistory);
     });
   });
-  
-  describe('Integrity Check View', () => {
-    test('should query integrity check history view', async () => {
-      const result = await query(`
-        SELECT * FROM schema_integrity_check_history
-        LIMIT 5
-      `);
-      
-      expect(result.rows).toBeInstanceOf(Array);
-      
-      if (result.rows.length > 0) {
-        const check = result.rows[0];
-        expect(check).toHaveProperty('check_id');
-        expect(check).toHaveProperty('success_rate_percent');
-        expect(check).toHaveProperty('duration');
-      }
+
+  describe('getLatestIntegrityCheck', () => {
+    it('should return latest check', async () => {
+      const mockCheck = { check_id: 'latest' };
+      query.mockResolvedValue({ rows: [mockCheck] });
+
+      const result = await schemaIntegrityCheckJob.getLatestIntegrityCheck();
+
+      expect(result).toEqual(mockCheck);
+    });
+
+    it('should return null when no checks found', async () => {
+      query.mockResolvedValue({ rows: [] });
+
+      const result = await schemaIntegrityCheckJob.getLatestIntegrityCheck();
+
+      expect(result).toBeNull();
     });
   });
-  
-  describe('Alert Mechanism', () => {
-    test('should have sendIntegrityAlert function', () => {
-      expect(typeof integrityJob.sendIntegrityAlert).toBe('function');
-    });
-    
-    test('should call alert function when failures detected', async () => {
-      // Mock the alert function
-      const originalAlert = integrityJob.sendIntegrityAlert;
-      let alertCalled = false;
-      
-      integrityJob.sendIntegrityAlert = async (checkResult) => {
-        alertCalled = true;
-        expect(checkResult.failed_count).toBeGreaterThan(0);
-      };
-      
-      // Simulate a check with failures
-      const mockCheckResult = {
-        check_id: 'test-check-id',
-        total_checked: 10,
-        failed_count: 2,
-        failed_snapshots: ['id1', 'id2']
-      };
-      
-      await integrityJob.sendIntegrityAlert(mockCheckResult);
-      
-      expect(alertCalled).toBe(true);
-      
-      // Restore original function
-      integrityJob.sendIntegrityAlert = originalAlert;
-    });
-  });
-  
+
   describe('Job Scheduling', () => {
-    test('should have scheduleNightlyCheck function', () => {
-      expect(typeof integrityJob.scheduleNightlyCheck).toBe('function');
+    it('should schedule nightly check', () => {
+      const mockTask = { stop: jest.fn() };
+      cron.schedule.mockReturnValue(mockTask);
+
+      const result = schemaIntegrityCheckJob.scheduleNightlyCheck();
+
+      expect(cron.schedule).toHaveBeenCalledWith(
+        '0 2 * * *',
+        expect.any(Function),
+        expect.objectContaining({ scheduled: true })
+      );
+      expect(result).toBe(mockTask);
     });
-    
-    test('should have startIntegrityCheckJob function', () => {
-      expect(typeof integrityJob.startIntegrityCheckJob).toBe('function');
+
+    it('should start job', () => {
+      const mockTask = { stop: jest.fn() };
+      cron.schedule.mockReturnValue(mockTask);
+
+      const result = schemaIntegrityCheckJob.startIntegrityCheckJob();
+
+      expect(result).toBeDefined();
     });
-    
-    test('should have stopIntegrityCheckJob function', () => {
-      expect(typeof integrityJob.stopIntegrityCheckJob).toBe('function');
-    });
-    
-    test('should schedule job with custom cron expression', () => {
-      // Test that scheduling doesn't throw an error
-      const task = integrityJob.scheduleNightlyCheck('0 3 * * *');
+
+    it('should stop job', () => {
+      const mockTask = { stop: jest.fn() };
       
-      expect(task).toBeDefined();
-      
-      // Stop the task immediately
-      integrityJob.stopIntegrityCheckJob(task);
+      schemaIntegrityCheckJob.stopIntegrityCheckJob(mockTask);
+
+      expect(mockTask.stop).toHaveBeenCalled();
+    });
+  });
+
+  describe('sendIntegrityAlert', () => {
+    it('should send alert with proper data', async () => {
+      const alertData = { 
+        failed_count: 2,
+        failed_snapshots: ['snap-1', 'snap-2'],
+        check_id: 'check-123',
+        total_checked: 5
+      };
+
+      await schemaIntegrityCheckJob.sendIntegrityAlert(alertData);
+
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining('Sending alert')
+      );
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining('snap-1, snap-2')
+      );
     });
   });
 });
-

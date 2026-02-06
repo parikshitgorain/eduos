@@ -435,4 +435,85 @@ describe('Enrollment Routes', () => {
       expect(response.body.success).toBe(false);
     });
   });
+
+  describe('Additional Coverage Tests', () => {
+    it('should handle enrollment with all optional fields', async () => {
+      const mockEnrollment = {
+        enrollment_id: mockEnrollmentId,
+        student_id: mockStudentId,
+        batch_id: mockBatchId,
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
+        status: 'active',
+        metadata: { notes: 'Test enrollment' },
+      };
+      
+      enrollmentService.createEnrollment.mockResolvedValue(mockEnrollment);
+      
+      const response = await request(app)
+        .post('/api/v1/enrollments')
+        .send({
+          student_id: mockStudentId,
+          batch_id: mockBatchId,
+          start_date: '2026-01-01',
+          end_date: '2026-12-31',
+          metadata: { notes: 'Test enrollment' },
+        });
+      
+      expect(response.status).toBe(201);
+      expect(response.body.enrollment.metadata).toBeDefined();
+    });
+
+    it('should handle database errors gracefully', async () => {
+      enrollmentService.createEnrollment.mockRejectedValue(
+        new Error('Database connection failed')
+      );
+      
+      const response = await request(app)
+        .post('/api/v1/enrollments')
+        .send({
+          student_id: mockStudentId,
+          batch_id: mockBatchId,
+          start_date: '2026-01-01',
+        });
+      
+      expect(response.status).toBe(500);
+    });
+
+    it('should list enrollments with all query parameters', async () => {
+      enrollmentService.listEnrollments.mockResolvedValue({
+        enrollments: [],
+        pagination: { page: 2, limit: 10, total: 0, pages: 0 },
+      });
+      
+      const response = await request(app)
+        .get('/api/v1/enrollments?page=2&limit=10&status=active&batchId=' + mockBatchId);
+      
+      expect(response.status).toBe(200);
+    });
+
+    it('should handle enrollment updates with partial data', async () => {
+      enrollmentService.updateEnrollmentStatus.mockResolvedValue({
+        enrollment_id: mockEnrollmentId,
+        status: 'completed',
+      });
+      
+      const response = await request(app)
+        .patch(`/api/v1/enrollments/${mockEnrollmentId}/status`)
+        .send({ status: 'completed' });
+      
+      expect(response.status).toBe(200);
+    });
+
+    it('should handle enrollment deletion errors', async () => {
+      enrollmentService.deleteEnrollment.mockRejectedValue(
+        new Error('Cannot delete active enrollment')
+      );
+      
+      const response = await request(app)
+        .delete(`/api/v1/enrollments/${mockEnrollmentId}`);
+      
+      expect(response.status).toBe(500);
+    });
+  });
 });
