@@ -1,0 +1,146 @@
+# Alertmanager configuration for EduOS Platform
+# Routes alerts to appropriate channels based on severity
+
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'alerts@eduos.platform'
+  smtp_auth_username: 'alerts@eduos.platform'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+
+# Templates for alert notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree for alert routing
+route:
+  receiver: 'default'
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 0s
+      repeat_interval: 5m
+      continue: true
+
+    # Warning alerts - batched notifications
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 30s
+      repeat_interval: 1h
+
+    # Info alerts - daily digest
+    - match:
+        severity: info
+      receiver: 'info-alerts'
+      group_wait: 5m
+      repeat_interval: 24h
+
+    # Security alerts - immediate notification to security team
+    - match:
+        component: security
+      receiver: 'security-team'
+      group_wait: 0s
+      repeat_interval: 5m
+
+    # Database alerts
+    - match:
+        component: database
+      receiver: 'database-team'
+      group_wait: 30s
+      repeat_interval: 30m
+
+# Inhibition rules to prevent alert spam
+inhibit_rules:
+  # Inhibit warning if critical is firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
+
+  # Inhibit instance down alerts if system is down
+  - source_match:
+      alertname: 'InstanceDown'
+    target_match_re:
+      alertname: '.*'
+    equal: ['instance']
+
+# Receiver configurations
+receivers:
+  - name: 'default'
+    email_configs:
+      - to: 'ops-team@eduos.platform'
+        headers:
+          Subject: '[EduOS] {{ .GroupLabels.alertname }}'
+        html: '{{ template "email.default.html" . }}'
+
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'ops-team@eduos.platform,cto@eduos.platform'
+        headers:
+          Subject: '[CRITICAL] {{ .GroupLabels.alertname }}'
+        html: '{{ template "email.critical.html" . }}'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts-critical'
+        title: '[CRITICAL] {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        color: 'danger'
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY}'
+        description: '{{ .GroupLabels.alertname }}'
+
+  - name: 'warning-alerts'
+    email_configs:
+      - to: 'ops-team@eduos.platform'
+        headers:
+          Subject: '[WARNING] {{ .GroupLabels.alertname }}'
+        html: '{{ template "email.warning.html" . }}'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts-warning'
+        title: '[WARNING] {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        color: 'warning'
+
+  - name: 'info-alerts'
+    email_configs:
+      - to: 'ops-team@eduos.platform'
+        headers:
+          Subject: '[INFO] Daily Alert Digest'
+        html: '{{ template "email.info.html" . }}'
+
+  - name: 'security-team'
+    email_configs:
+      - to: 'security@eduos.platform,ciso@eduos.platform'
+        headers:
+          Subject: '[SECURITY] {{ .GroupLabels.alertname }}'
+        html: '{{ template "email.security.html" . }}'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#security-alerts'
+        title: '[SECURITY] {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        color: 'danger'
+
+  - name: 'database-team'
+    email_configs:
+      - to: 'database-team@eduos.platform'
+        headers:
+          Subject: '[DATABASE] {{ .GroupLabels.alertname }}'
+        html: '{{ template "email.database.html" . }}'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#database-alerts'
+        title: '[DATABASE] {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        color: 'warning'

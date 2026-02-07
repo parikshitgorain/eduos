@@ -181,6 +181,7 @@ eduos-platform/
 | [Task 4.3.3](tasks/TASK_4.3.3_IMPLEMENTATION_SUMMARY.md) | Encryption at Rest and In Transit | ✅ Complete |
 | [Task 4.3.4](tasks/TASK_4.3.4_IMPLEMENTATION_SUMMARY.md) | Penetration Testing on Custom Domain Routing | ✅ Complete |
 | [Task 4.3.5](tasks/TASK_4.3.5_IMPLEMENTATION_SUMMARY.md) | Security Monitoring and Incident Response | ✅ Complete |
+| [Task 4.4.2](tasks/TASK_4.4.2_IMPLEMENTATION_SUMMARY.md) | Backup and Disaster Recovery | ✅ Complete |
 | [Test Coverage Improvements](tasks/TEST_COVERAGE_IMPROVEMENT_SUMMARY.md) | Refunds & Payment Service Coverage | ✅ Complete |
 | [Security Hardening](tasks/SECURITY_HARDENING_IMPLEMENTATION_SUMMARY.md) | Comprehensive Security Fixes | ✅ Complete |
 
@@ -198,7 +199,14 @@ eduos-platform/
 | [Bank Reconciliation](BANK_RECONCILIATION.md) | Bank statement reconciliation system | All |
 | [Bank Reconciliation Quick Start](BANK_RECONCILIATION_QUICK_START.md) | 5-minute quick start for reconciliation | Developers |
 
-### 7. AI Service Documentation
+### 7. Backup & Disaster Recovery Documentation
+
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [Disaster Recovery Plan](DISASTER_RECOVERY_PLAN.md) | Comprehensive DR plan with RTO/RPO targets | All |
+| [Backup Quick Start](BACKUP_QUICK_START.md) | Setup and usage guide for backups | Developers |
+
+### 8. AI Service Documentation
 
 | Document | Description | Audience |
 |----------|-------------|----------|

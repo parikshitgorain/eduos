@@ -73,7 +73,9 @@ database/
    ├── 021_encryption_at_rest.sql             # Encryption at rest ✅
    ├── 021_encryption_at_rest_rollback.sql    # Encryption rollback
    ├── 022_security_monitoring.sql            # Security monitoring ✅
-   └── 022_security_monitoring_rollback.sql   # Security monitoring rollback
+   ├── 022_security_monitoring_rollback.sql   # Security monitoring rollback
+   ├── 023_backup_system.sql                  # Backup and disaster recovery ✅
+   └── 023_backup_system_rollback.sql         # Backup system rollback
 ├── tests/                              # Test suites
 │   └── rls_isolation.test.sql         # RLS isolation tests
 └── docs/                               # Documentation

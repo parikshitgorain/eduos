@@ -1,0 +1,43 @@
+# Jaeger distributed tracing configuration for EduOS Platform
+
+# Sampling configuration
+sampling:
+  default_strategy:
+    type: probabilistic
+    param: 0.1  # Sample 10% of traces in production
+  per_operation_strategies:
+    default_sampling_probability: 0.1
+    default_lower_bound_traces_per_second: 1.0
+
+# Storage configuration
+storage:
+  type: elasticsearch
+  options:
+    es:
+      server-urls: http://elasticsearch:9200
+      index-prefix: jaeger
+      num-shards: 5
+      num-replicas: 1
+
+# Query service configuration
+query:
+  base-path: /
+  static-files: /go/jaeger-ui/
+  ui-config: /etc/jaeger/ui-config.json
+
+# Collector configuration
+collector:
+  zipkin:
+    host-port: :9411
+  grpc:
+    host-port: :14250
+  http:
+    host-port: :14268
+
+# Agent configuration
+agent:
+  processor:
+    jaeger-compact:
+      server-host-port: :6831
+    jaeger-binary:
+      server-host-port: :6832

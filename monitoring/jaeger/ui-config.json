@@ -1,0 +1,36 @@
+{
+  "monitor": {
+    "menuEnabled": true
+  },
+  "dependencies": {
+    "menuEnabled": true
+  },
+  "archiveEnabled": true,
+  "tracking": {
+    "gaID": null,
+    "trackErrors": true
+  },
+  "menu": [
+    {
+      "label": "EduOS Documentation",
+      "items": [
+        {
+          "label": "API Docs",
+          "url": "https://docs.eduos.platform/api"
+        },
+        {
+          "label": "Architecture",
+          "url": "https://docs.eduos.platform/architecture"
+        }
+      ]
+    }
+  ],
+  "linkPatterns": [
+    {
+      "type": "logs",
+      "key": "tenant_id",
+      "url": "http://kibana:5601/app/discover#/?_a=(query:(language:kuery,query:'tenant_id:#{tenant_id}'))",
+      "text": "View logs for tenant #{tenant_id}"
+    }
+  ]
+}
