@@ -183,6 +183,8 @@ eduos-platform/
 | [Task 4.3.5](tasks/TASK_4.3.5_IMPLEMENTATION_SUMMARY.md) | Security Monitoring and Incident Response | ✅ Complete |
 | [Task 4.4.2](tasks/TASK_4.4.2_IMPLEMENTATION_SUMMARY.md) | Backup and Disaster Recovery | ✅ Complete |
 | [Task 4.4.3](tasks/TASK_4.4.3_IMPLEMENTATION_SUMMARY.md) | CI/CD Deployment Pipeline | ✅ Complete |
+| [Task 4.4.4](tasks/TASK_4.4.4_IMPLEMENTATION_SUMMARY.md) | Performance Optimization and Caching | ✅ Complete |
+| [Task 4.4.5](tasks/TASK_4.4.5_IMPLEMENTATION_SUMMARY.md) | Documentation and Training Materials | ✅ Complete |
 | [Test Coverage Improvements](tasks/TEST_COVERAGE_IMPROVEMENT_SUMMARY.md) | Refunds & Payment Service Coverage | ✅ Complete |
 | [Security Hardening](tasks/SECURITY_HARDENING_IMPLEMENTATION_SUMMARY.md) | Comprehensive Security Fixes | ✅ Complete |
 
@@ -283,7 +285,19 @@ eduos-platform/
 | [reset-postgres-password.ps1](../scripts/reset-postgres-password.ps1) | Reset PostgreSQL password | Run as Administrator |
 | [reset-postgres-password.sql](../scripts/reset-postgres-password.sql) | SQL for password reset | Use with psql |
 
-### 10. Utility Scripts
+### 10. Documentation & Training
+
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [API Reference](API_REFERENCE.md) | Complete API documentation with OpenAPI 3.0 | Developers |
+| [Admin Guide](ADMIN_GUIDE.md) | Comprehensive administrator guide | Administrators |
+| [Developer Guide](DEVELOPER_GUIDE.md) | Technical guide for developers | Developers |
+| [Knowledge Base](KNOWLEDGE_BASE.md) | FAQ and troubleshooting guide | All |
+| [Training Materials](TRAINING_MATERIALS.md) | Training program and certification | All |
+| [Video Tutorial Scripts](VIDEO_TUTORIAL_SCRIPTS.md) | Video tutorial scripts (5-10 min each) | All |
+| [Task 4.4.5](tasks/TASK_4.4.5_IMPLEMENTATION_SUMMARY.md) | Documentation implementation summary | Developers |
+
+### 11. Utility Scripts
 
 | Document | Description | Audience |
 |----------|-------------|----------|
@@ -345,6 +359,18 @@ eduos-platform/
 
 **...understand file organization**
 → [File Organization](FILE_ORGANIZATION.md)
+
+**...learn the API**
+→ [API Reference](API_REFERENCE.md) → [Developer Guide](DEVELOPER_GUIDE.md)
+
+**...get administrator training**
+→ [Admin Guide](ADMIN_GUIDE.md) → [Training Materials](TRAINING_MATERIALS.md)
+
+**...find answers quickly**
+→ [Knowledge Base](KNOWLEDGE_BASE.md) → FAQ section
+
+**...watch video tutorials**
+→ [Video Tutorial Scripts](VIDEO_TUTORIAL_SCRIPTS.md)
 
 **...understand the architecture**
 → [Design Document](../.kiro/specs/eduos-platform/design.md)
@@ -536,6 +562,6 @@ If you find issues with documentation:
 
 ---
 
-**Last Updated:** 2026-02-07  
+**Last Updated:** 2026-02-08  
 **Documentation Version:** 1.0  
 **Project Phase:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 Complete ✅ | Phase 4: 13/17 (76%) 🚀
