@@ -602,7 +602,7 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 - ✅ Threshold: scores > 0.75 flagged as potential duplicates
 - ✅ API: POST `/api/v1/students/check-duplicates` returns candidate pairs
 - ✅ Performance: < 500ms for 100K student database
-- ✅ 17 unit tests passing
+- ✅ 41 unit tests passing (27 service + 14 route tests)
 
 #### ✅ Task 3.2.2: Integrate Sentence-BERT for semantic matching - COMPLETED
 - ✅ SBERT model loaded in AI service (`all-MiniLM-L6-v2`)
