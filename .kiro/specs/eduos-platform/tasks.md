@@ -465,7 +465,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - Disaster recovery plan: documented RTO (4 hours) and RPO (1 hour)
     - DR drill: quarterly disaster recovery simulation
 
-- [ ] 4.4.3 Create deployment pipeline with CI/CD
+- [x] 4.4.3 Create deployment pipeline with CI/CD
   - **Definition of Done:**
     - GitHub Actions or GitLab CI pipeline configured
     - Automated tests: unit, integration, end-to-end

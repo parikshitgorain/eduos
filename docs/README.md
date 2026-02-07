@@ -182,6 +182,7 @@ eduos-platform/
 | [Task 4.3.4](tasks/TASK_4.3.4_IMPLEMENTATION_SUMMARY.md) | Penetration Testing on Custom Domain Routing | ✅ Complete |
 | [Task 4.3.5](tasks/TASK_4.3.5_IMPLEMENTATION_SUMMARY.md) | Security Monitoring and Incident Response | ✅ Complete |
 | [Task 4.4.2](tasks/TASK_4.4.2_IMPLEMENTATION_SUMMARY.md) | Backup and Disaster Recovery | ✅ Complete |
+| [Task 4.4.3](tasks/TASK_4.4.3_IMPLEMENTATION_SUMMARY.md) | CI/CD Deployment Pipeline | ✅ Complete |
 | [Test Coverage Improvements](tasks/TEST_COVERAGE_IMPROVEMENT_SUMMARY.md) | Refunds & Payment Service Coverage | ✅ Complete |
 | [Security Hardening](tasks/SECURITY_HARDENING_IMPLEMENTATION_SUMMARY.md) | Comprehensive Security Fixes | ✅ Complete |
 
@@ -206,7 +207,15 @@ eduos-platform/
 | [Disaster Recovery Plan](DISASTER_RECOVERY_PLAN.md) | Comprehensive DR plan with RTO/RPO targets | All |
 | [Backup Quick Start](BACKUP_QUICK_START.md) | Setup and usage guide for backups | Developers |
 
-### 8. AI Service Documentation
+### 8. CI/CD & Deployment Documentation
+
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [CI/CD Quick Start](CI_CD_QUICK_START.md) | Complete CI/CD pipeline guide | DevOps |
+| [Deployment Guide](../deployment/README.md) | Blue/Green deployment documentation | DevOps |
+| [GitHub Actions Workflows](../.github/workflows/README.md) | Workflow configuration reference | Developers |
+
+### 9. AI Service Documentation
 
 | Document | Description | Audience |
 |----------|-------------|----------|

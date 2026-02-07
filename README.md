@@ -1,8 +1,13 @@
 # EduOS Platform
 
+[![CI Pipeline](https://github.com/your-org/eduos-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/eduos-platform/actions/workflows/ci.yml)
+[![CD Pipeline](https://github.com/your-org/eduos-platform/actions/workflows/cd.yml/badge.svg)](https://github.com/your-org/eduos-platform/actions/workflows/cd.yml)
+[![codecov](https://codecov.io/gh/your-org/eduos-platform/branch/main/graph/badge.svg)](https://codecov.io/gh/your-org/eduos-platform)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 **Version:** 1.0  
 **Status:** In Development  
-**Last Updated:** 2026-02-05
+**Last Updated:** 2026-02-08
 
 ---
 

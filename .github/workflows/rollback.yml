@@ -1,0 +1,292 @@
+name: Rollback Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: 'Version to rollback to (leave empty for previous version)'
+        required: false
+        type: string
+      reason:
+        description: 'Reason for rollback'
+        required: true
+        type: string
+
+jobs:
+  # ============================================================================
+  # Job 1: Rollback Approval
+  # ============================================================================
+  approval:
+    name: Rollback Approval
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Request rollback approval
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.TOKEN }}
+          approvers: ${{ secrets.DEPLOYMENT_APPROVERS }}
+          minimum-approvals: 1
+          issue-title: "Rollback Approval Required - ${{ github.event.inputs.environment }}"
+          issue-body: |
+            **Environment:** ${{ github.event.inputs.environment }}
+            **Target Version:** ${{ github.event.inputs.version || 'Previous Version' }}
+            **Reason:** ${{ github.event.inputs.reason }}
+            **Requested By:** ${{ github.actor }}
+            **Timestamp:** ${{ github.event.created_at }}
+            
+            ⚠️ **WARNING:** This will rollback the ${{ github.event.inputs.environment }} environment.
+            
+            Please review and approve this rollback request.
+
+  # ============================================================================
+  # Job 2: Determine Rollback Target
+  # ============================================================================
+  determine-target:
+    name: Determine Rollback Target
+    runs-on: ubuntu-latest
+    needs: [approval]
+    
+    outputs:
+      target_version: ${{ steps.target.outputs.version }}
+      current_version: ${{ steps.current.outputs.version }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Get current version
+        id: current
+        run: |
+          # Get current deployed version from deployment records
+          CURRENT_VERSION=$(curl -s https://${{ github.event.inputs.environment }}.eduos.com/api/v1/version | jq -r '.version')
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+      
+      - name: Determine target version
+        id: target
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            TARGET_VERSION="${{ github.event.inputs.version }}"
+          else
+            # Get previous version from deployment history
+            TARGET_VERSION=$(cat deployment-history.json | jq -r '.[-2].version')
+          fi
+          echo "version=$TARGET_VERSION" >> $GITHUB_OUTPUT
+          echo "Target version: $TARGET_VERSION"
+      
+      - name: Validate target version
+        run: |
+          # Check if target version exists
+          if ! docker manifest inspect ${{ secrets.DOCKER_USERNAME }}/eduos-platform:${{ steps.target.outputs.version }} > /dev/null 2>&1; then
+            echo "Error: Target version ${{ steps.target.outputs.version }} not found"
+            exit 1
+          fi
+
+  # ============================================================================
+  # Job 3: Create Backup Snapshot
+  # ============================================================================
+  backup:
+    name: Create Backup Snapshot
+    runs-on: ubuntu-latest
+    needs: [approval, determine-target]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Create database snapshot
+        run: |
+          chmod +x ./deployment/create-snapshot.sh
+          ./deployment/create-snapshot.sh ${{ github.event.inputs.environment }} "pre-rollback-$(date +%Y%m%d-%H%M%S)"
+      
+      - name: Backup current configuration
+        run: |
+          mkdir -p rollback-backup
+          kubectl get configmap -n ${{ github.event.inputs.environment }} -o yaml > rollback-backup/configmaps.yaml
+          kubectl get secret -n ${{ github.event.inputs.environment }} -o yaml > rollback-backup/secrets.yaml
+      
+      - name: Upload backup artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-backup-${{ github.event.inputs.environment }}-${{ github.run_number }}
+          path: rollback-backup/
+          retention-days: 30
+
+  # ============================================================================
+  # Job 4: Execute Rollback
+  # ============================================================================
+  rollback:
+    name: Execute Rollback
+    runs-on: ubuntu-latest
+    needs: [approval, determine-target, backup]
+    environment:
+      name: ${{ github.event.inputs.environment }}
+      url: https://${{ github.event.inputs.environment }}.eduos.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Switch traffic back to Green (previous version)
+        run: |
+          chmod +x ./deployment/traffic-shift.sh
+          # Instantly switch 100% traffic to green (old version)
+          ./deployment/traffic-shift.sh green 100
+      
+      - name: Verify rollback health
+        timeout-minutes: 5
+        run: |
+          chmod +x ./deployment/health-check.sh
+          ./deployment/health-check.sh green ${{ github.event.inputs.environment }}
+      
+      - name: Run smoke tests
+        run: |
+          chmod +x ./deployment/smoke-tests.sh
+          ./deployment/smoke-tests.sh green ${{ github.event.inputs.environment }}
+      
+      - name: Update deployment record
+        run: |
+          cat > rollback-record.json << EOF
+          {
+            "action": "rollback",
+            "environment": "${{ github.event.inputs.environment }}",
+            "from_version": "${{ needs.determine-target.outputs.current_version }}",
+            "to_version": "${{ needs.determine-target.outputs.target_version }}",
+            "reason": "${{ github.event.inputs.reason }}",
+            "rolled_back_by": "${{ github.actor }}",
+            "rolled_back_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+      
+      - name: Upload rollback record
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-record-${{ github.run_number }}
+          path: rollback-record.json
+          retention-days: 90
+
+  # ============================================================================
+  # Job 5: Post-Rollback Validation
+  # ============================================================================
+  validate:
+    name: Post-Rollback Validation
+    runs-on: ubuntu-latest
+    needs: [determine-target, rollback]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Verify version
+        run: |
+          DEPLOYED_VERSION=$(curl -s https://${{ github.event.inputs.environment }}.eduos.com/api/v1/version | jq -r '.version')
+          if [ "$DEPLOYED_VERSION" != "${{ needs.determine-target.outputs.target_version }}" ]; then
+            echo "Error: Rollback verification failed. Expected ${{ needs.determine-target.outputs.target_version }}, got $DEPLOYED_VERSION"
+            exit 1
+          fi
+          echo "✅ Rollback successful: Version $DEPLOYED_VERSION"
+      
+      - name: Run end-to-end tests
+        env:
+          BASE_URL: https://${{ github.event.inputs.environment }}.eduos.com
+          API_KEY: ${{ secrets.E2E_API_KEY }}
+        run: |
+          npm ci
+          npm run test:e2e || true
+      
+      - name: Monitor error rates
+        timeout-minutes: 5
+        run: |
+          chmod +x ./deployment/monitor-metrics.sh
+          ./deployment/monitor-metrics.sh ${{ github.event.inputs.environment }}
+      
+      - name: Notify rollback success
+        uses: 8398a7/action-slack@v3
+        if: success()
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "🔄 Rollback Successful",
+              attachments: [{
+                color: 'warning',
+                text: `Environment: ${{ github.event.inputs.environment }}\nFrom: ${{ needs.determine-target.outputs.current_version }}\nTo: ${{ needs.determine-target.outputs.target_version }}\nReason: ${{ github.event.inputs.reason }}`
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      
+      - name: Notify rollback failure
+        uses: 8398a7/action-slack@v3
+        if: failure()
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "❌ Rollback Failed",
+              attachments: [{
+                color: 'danger',
+                text: `Environment: ${{ github.event.inputs.environment }}\nTarget: ${{ needs.determine-target.outputs.target_version }}\n⚠️ Manual intervention required!`
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      
+      - name: Create incident report
+        if: failure()
+        run: |
+          cat > incident-report.md << EOF
+          # Rollback Failure Incident Report
+          
+          ## Summary
+          - **Environment:** ${{ github.event.inputs.environment }}
+          - **Target Version:** ${{ needs.determine-target.outputs.target_version }}
+          - **Current Version:** ${{ needs.determine-target.outputs.current_version }}
+          - **Timestamp:** $(date -u)
+          - **Initiated By:** ${{ github.actor }}
+          
+          ## Reason for Rollback
+          ${{ github.event.inputs.reason }}
+          
+          ## Failure Details
+          The rollback process failed during validation. Manual intervention is required.
+          
+          ## Next Steps
+          1. Review deployment logs
+          2. Check application health
+          3. Verify database state
+          4. Contact on-call engineer
+          
+          ## Backup Information
+          Backup artifacts are available in workflow run #${{ github.run_number }}
+          EOF
+      
+      - name: Upload incident report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: incident-report-${{ github.run_number }}
+          path: incident-report.md
+          retention-days: 90

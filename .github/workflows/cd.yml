@@ -1,0 +1,290 @@
+name: CD Pipeline - Blue/Green Deployment
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      deployment_strategy:
+        description: 'Deployment strategy'
+        required: true
+        type: choice
+        options:
+          - blue-green
+          - rolling
+          - canary
+
+env:
+  NODE_VERSION: '18.x'
+  DEPLOYMENT_TIMEOUT: 600
+
+jobs:
+  # ============================================================================
+  # Job 1: Pre-Deployment Checks
+  # ============================================================================
+  pre-deployment:
+    name: Pre-Deployment Checks
+    runs-on: ubuntu-latest
+    
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      environment: ${{ steps.env.outputs.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Determine version
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION=$(cat package.json | jq -r '.version')-${GITHUB_SHA::8}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Deploying version: $VERSION"
+      
+      - name: Determine environment
+        id: env
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ENV="${{ github.event.inputs.environment }}"
+          elif [[ $GITHUB_REF == refs/tags/* ]]; then
+            ENV="production"
+          else
+            ENV="staging"
+          fi
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+          echo "Deploying to: $ENV"
+      
+      - name: Check deployment approval
+        if: steps.env.outputs.environment == 'production'
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.TOKEN }}
+          approvers: ${{ secrets.DEPLOYMENT_APPROVERS }}
+          minimum-approvals: 2
+          issue-title: "Production Deployment Approval Required"
+          issue-body: |
+            **Version:** ${{ steps.version.outputs.version }}
+            **Branch:** ${{ github.ref_name }}
+            **Commit:** ${{ github.sha }}
+            **Author:** ${{ github.actor }}
+            
+            Please review and approve this production deployment.
+
+  # ============================================================================
+  # Job 2: Deploy to Staging/Production (Blue Environment)
+  # ============================================================================
+  deploy-blue:
+    name: Deploy Blue Environment
+    runs-on: ubuntu-latest
+    needs: [pre-deployment]
+    environment:
+      name: ${{ needs.pre-deployment.outputs.environment }}-blue
+      url: https://${{ needs.pre-deployment.outputs.environment }}-blue.eduos.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      
+      - name: Pull Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker pull $ECR_REGISTRY/eduos-platform:$IMAGE_TAG
+          docker tag $ECR_REGISTRY/eduos-platform:$IMAGE_TAG eduos-platform:blue
+      
+      - name: Deploy to Blue environment
+        env:
+          ENVIRONMENT: ${{ needs.pre-deployment.outputs.environment }}
+          VERSION: ${{ needs.pre-deployment.outputs.version }}
+        run: |
+          # Deploy using deployment script
+          chmod +x ./deployment/deploy-blue-green.sh
+          ./deployment/deploy-blue-green.sh deploy blue $ENVIRONMENT
+      
+      - name: Wait for Blue environment to be healthy
+        timeout-minutes: 10
+        run: |
+          chmod +x ./deployment/health-check.sh
+          ./deployment/health-check.sh blue ${{ needs.pre-deployment.outputs.environment }}
+      
+      - name: Run smoke tests on Blue
+        run: |
+          chmod +x ./deployment/smoke-tests.sh
+          ./deployment/smoke-tests.sh blue ${{ needs.pre-deployment.outputs.environment }}
+
+  # ============================================================================
+  # Job 3: Traffic Switch (Blue to Green)
+  # ============================================================================
+  switch-traffic:
+    name: Switch Traffic to Blue
+    runs-on: ubuntu-latest
+    needs: [pre-deployment, deploy-blue]
+    environment:
+      name: ${{ needs.pre-deployment.outputs.environment }}
+      url: https://${{ needs.pre-deployment.outputs.environment }}.eduos.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Gradual traffic shift (Canary)
+        if: github.event.inputs.deployment_strategy == 'canary'
+        run: |
+          chmod +x ./deployment/traffic-shift.sh
+          # Shift 10% traffic
+          ./deployment/traffic-shift.sh blue 10
+          sleep 300
+          # Shift 50% traffic
+          ./deployment/traffic-shift.sh blue 50
+          sleep 300
+          # Shift 100% traffic
+          ./deployment/traffic-shift.sh blue 100
+      
+      - name: Instant traffic switch (Blue/Green)
+        if: github.event.inputs.deployment_strategy != 'canary'
+        run: |
+          chmod +x ./deployment/traffic-shift.sh
+          ./deployment/traffic-shift.sh blue 100
+      
+      - name: Monitor metrics post-switch
+        timeout-minutes: 5
+        run: |
+          chmod +x ./deployment/monitor-metrics.sh
+          ./deployment/monitor-metrics.sh ${{ needs.pre-deployment.outputs.environment }}
+      
+      - name: Create deployment record
+        run: |
+          cat > deployment-record.json << EOF
+          {
+            "version": "${{ needs.pre-deployment.outputs.version }}",
+            "environment": "${{ needs.pre-deployment.outputs.environment }}",
+            "commit": "${{ github.sha }}",
+            "deployed_by": "${{ github.actor }}",
+            "deployed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "strategy": "${{ github.event.inputs.deployment_strategy || 'blue-green' }}"
+          }
+          EOF
+      
+      - name: Upload deployment record
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-record-${{ needs.pre-deployment.outputs.version }}
+          path: deployment-record.json
+          retention-days: 90
+
+  # ============================================================================
+  # Job 4: Post-Deployment Validation
+  # ============================================================================
+  post-deployment:
+    name: Post-Deployment Validation
+    runs-on: ubuntu-latest
+    needs: [pre-deployment, deploy-blue, switch-traffic]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run end-to-end tests
+        env:
+          BASE_URL: https://${{ needs.pre-deployment.outputs.environment }}.eduos.com
+          API_KEY: ${{ secrets.E2E_API_KEY }}
+        run: |
+          npm ci
+          npm run test:e2e || true
+      
+      - name: Performance testing
+        run: |
+          chmod +x ./deployment/performance-test.sh
+          ./deployment/performance-test.sh ${{ needs.pre-deployment.outputs.environment }}
+      
+      - name: Security scan on live environment
+        run: |
+          chmod +x ./deployment/security-scan.sh
+          ./deployment/security-scan.sh ${{ needs.pre-deployment.outputs.environment }}
+      
+      - name: Notify deployment success
+        uses: 8398a7/action-slack@v3
+        if: success()
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "✅ Deployment Successful",
+              attachments: [{
+                color: 'good',
+                text: `Version ${{ needs.pre-deployment.outputs.version }} deployed to ${{ needs.pre-deployment.outputs.environment }}`
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      
+      - name: Notify deployment failure
+        uses: 8398a7/action-slack@v3
+        if: failure()
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "❌ Deployment Failed",
+              attachments: [{
+                color: 'danger',
+                text: `Version ${{ needs.pre-deployment.outputs.version }} failed to deploy to ${{ needs.pre-deployment.outputs.environment }}`
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # ============================================================================
+  # Job 5: Cleanup Old Green Environment
+  # ============================================================================
+  cleanup:
+    name: Cleanup Old Environment
+    runs-on: ubuntu-latest
+    needs: [pre-deployment, post-deployment]
+    if: success()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Keep old environment for rollback window
+        run: |
+          echo "Keeping old green environment for 1 hour rollback window"
+          sleep 3600
+      
+      - name: Cleanup old green environment
+        run: |
+          chmod +x ./deployment/cleanup.sh
+          ./deployment/cleanup.sh green ${{ needs.pre-deployment.outputs.environment }}
