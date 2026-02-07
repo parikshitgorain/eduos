@@ -61,7 +61,17 @@ database/
 │   ├── 015_approval_queue.sql                 # AI approval queue ✅
    ├── 015_approval_queue_rollback.sql        # Approval queue rollback
    ├── 016_payment_gateway.sql                # Payment gateway ✅
-   └── 016_payment_gateway_rollback.sql       # Payment gateway rollback
+   ├── 016_payment_gateway_rollback.sql       # Payment gateway rollback
+   ├── 017_invoice_generation.sql             # Invoice generation ✅
+   ├── 017_invoice_generation_rollback.sql    # Invoice rollback
+   ├── 018_refund_workflow.sql                # Refund workflow ✅
+   ├── 018_refund_workflow_rollback.sql       # Refund rollback
+   ├── 019_bank_reconciliation.sql            # Bank reconciliation ✅
+   ├── 019_bank_reconciliation_rollback.sql   # Reconciliation rollback
+   ├── 020_audit_log_system.sql               # Audit log system ✅
+   ├── 020_audit_log_system_rollback.sql      # Audit log rollback
+   ├── 021_encryption_at_rest.sql             # Encryption at rest ✅
+   └── 021_encryption_at_rest_rollback.sql    # Encryption rollback
 ├── tests/                              # Test suites
 │   └── rls_isolation.test.sql         # RLS isolation tests
 └── docs/                               # Documentation

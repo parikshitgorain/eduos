@@ -13,6 +13,7 @@ require('dotenv').config();
 const { tenantContext } = require('./middleware/tenantContext');
 const { healthCheck } = require('./config/database');
 const { healthCheck: redisHealthCheck } = require('./config/redis');
+const { securityMiddleware } = require('./middleware/securityProtection');
 
 // Initialize Express app
 const app = express();
@@ -65,6 +66,9 @@ app.use(cors({
 // Body parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Apply security protection middleware (SQL injection, XSS, output encoding)
+app.use(securityMiddleware);
 
 // Request logging middleware
 app.use((req, res, next) => {
