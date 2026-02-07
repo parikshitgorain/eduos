@@ -152,9 +152,22 @@ eduos-platform/
 | [Task 2.2.2](tasks/TASK_2.2.2_IMPLEMENTATION_SUMMARY.md) | Immutable Schema Snapshots with SHA-256 | ✅ Complete |
 | [Task 2.2.3](tasks/TASK_2.2.3_IMPLEMENTATION_SUMMARY.md) | Field-Level Permission System | ✅ Complete |
 | [Task 2.2.4](tasks/TASK_2.2.4_IMPLEMENTATION_SUMMARY.md) | Schema Migration Engine with Dry-Run Mode | ✅ Complete |
+| [Task 3.1.1](tasks/TASK_3.1.1_IMPLEMENTATION_SUMMARY.md) | Python FastAPI AI Service | ✅ Complete |
+| [Task 3.1.2](tasks/TASK_3.1.2_IMPLEMENTATION_SUMMARY.md) | AI Governance Framework | ✅ Complete |
 | [Security Hardening](tasks/SECURITY_HARDENING_IMPLEMENTATION_SUMMARY.md) | Comprehensive Security Fixes | ✅ Complete |
 
-### 6. Security Documentation
+### 6. AI Service Documentation
+
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [AI Service Setup](AI_SERVICE_SETUP.md) | Implementation summary | All |
+| [AI Service README](../ai-service/README.md) | Service overview | Developers |
+| [AI Architecture](../ai-service/ARCHITECTURE.md) | Architecture and governance | Architects |
+| [AI Deployment](../ai-service/DEPLOYMENT.md) | Deployment guide | DevOps |
+| [AI Quick Start](../ai-service/QUICK_START.md) | 5-minute quick start | Developers |
+| [Duplicate Detection API](DUPLICATE_DETECTION_API.md) | Fuzzy matching API reference | Developers |
+
+### 7. Security Documentation
 
 | Document | Description | Audience |
 |----------|-------------|----------|
@@ -296,6 +309,8 @@ All documentation should include:
 - ✅ Task 2.2.3 Summary (Field-Level Permission System)
 - ✅ Task 2.2.4 Summary (Schema Migration Engine with Dry-Run Mode)
 - ✅ Task 2.2.5 Summary (Historic Rendering with Snapshot Association)
+- ✅ Task 3.1.1 Summary (Python FastAPI AI Service)
+- ✅ Task 3.1.2 Summary (AI Governance Framework)
 - ✅ Security Hardening Implementation Summary
 - ✅ Security Guide
 - ✅ Security Fixes Report
@@ -354,6 +369,6 @@ If you find issues with documentation:
 
 ---
 
-**Last Updated:** 2026-02-05  
+**Last Updated:** 2026-02-07  
 **Documentation Version:** 1.0  
-**Project Phase:** Phase 1 Complete ✅ | Phase 2 In Progress (7/14 tasks)
+**Project Phase:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 In Progress (2/11 tasks)

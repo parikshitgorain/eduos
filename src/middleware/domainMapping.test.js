@@ -228,6 +228,41 @@ describe('Domain Mapping Middleware', () => {
       expect(mockRes.status).toHaveBeenCalledWith(404);
       expect(mockNext).not.toHaveBeenCalled();
     });
+
+    it('should return JSON 404 when HTML file not found', async () => {
+      // Mock fs.readFileSync to throw an error
+      const fs = require('fs');
+      const originalReadFileSync = fs.readFileSync;
+      fs.readFileSync = jest.fn().mockImplementation(() => {
+        throw new Error('File not found');
+      });
+
+      const mockReq = {
+        headers: {
+          host: 'nonexistent-domain.eduos.com'
+        }
+      };
+      const mockRes = {
+        status: jest.fn().mockReturnThis(),
+        type: jest.fn().mockReturnThis(),
+        send: jest.fn(),
+        json: jest.fn()
+      };
+      const mockNext = jest.fn();
+      
+      await domainMapping(mockReq, mockRes, mockNext);
+      
+      expect(mockRes.status).toHaveBeenCalledWith(404);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Not Found',
+        message: 'This domain is not registered with EduOS Platform',
+        domain: 'nonexistent-domain.eduos.com'
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+
+      // Restore original function
+      fs.readFileSync = originalReadFileSync;
+    });
     
     it('should attach domain info to request for valid domain', async () => {
       const mockReq = {
@@ -399,6 +434,89 @@ describe('Domain Mapping Middleware', () => {
       expect(mockReq.domainMappingOverhead).toBeDefined();
       
       consoleSpy.mockRestore();
+    });
+  });
+
+  describe('requireVerifiedDomain middleware', () => {
+    const { requireVerifiedDomain } = require('./domainMapping');
+
+    it('should return 500 if domain mapping not applied', () => {
+      const mockReq = {};
+      const mockRes = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+      const mockNext = jest.fn();
+
+      requireVerifiedDomain(mockReq, mockRes, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(500);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Internal Server Error',
+        message: 'Domain mapping middleware not applied'
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should return 403 for unverified custom domain', () => {
+      const mockReq = {
+        domain: {
+          type: 'custom',
+          isVerified: false
+        }
+      };
+      const mockRes = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+      const mockNext = jest.fn();
+
+      requireVerifiedDomain(mockReq, mockRes, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(403);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Forbidden',
+        message: 'This operation requires a verified custom domain'
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should allow verified custom domain', () => {
+      const mockReq = {
+        domain: {
+          type: 'custom',
+          isVerified: true
+        }
+      };
+      const mockRes = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+      const mockNext = jest.fn();
+
+      requireVerifiedDomain(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockRes.status).not.toHaveBeenCalled();
+    });
+
+    it('should allow subdomain', () => {
+      const mockReq = {
+        domain: {
+          type: 'subdomain',
+          isVerified: true
+        }
+      };
+      const mockRes = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+      const mockNext = jest.fn();
+
+      requireVerifiedDomain(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockRes.status).not.toHaveBeenCalled();
     });
   });
 });

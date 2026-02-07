@@ -450,6 +450,8 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 - [Task 2.2.3](docs/tasks/TASK_2.2.3_IMPLEMENTATION_SUMMARY.md) - Field-Level Permission System ✅
 - [Task 2.2.4](docs/tasks/TASK_2.2.4_IMPLEMENTATION_SUMMARY.md) - Schema Migration Engine ✅
 - [Task 2.2.5](docs/tasks/TASK_2.2.5_IMPLEMENTATION_SUMMARY.md) - Historic Rendering ✅
+- [Task 3.1.1](docs/tasks/TASK_3.1.1_IMPLEMENTATION_SUMMARY.md) - Python FastAPI AI Service ✅
+- [Task 3.1.2](docs/tasks/TASK_3.1.2_IMPLEMENTATION_SUMMARY.md) - AI Governance Framework ✅
 
 **Authentication:**
 - [Auth Service](docs/AUTH_SERVICE.md) - OAuth2/OIDC authentication service
@@ -471,6 +473,13 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 - [Schema System](docs/SCHEMA_SYSTEM.md) - Dynamic form schema management
 - [Schema Quick Start](docs/SCHEMA_QUICK_START.md) - Developer quick reference
 - [Historic Rendering](docs/HISTORIC_RENDERING.md) - Schema snapshot association and rendering
+
+**AI Service:**
+- [AI Service Setup](docs/AI_SERVICE_SETUP.md) - Python FastAPI AI inference service
+- [AI Service README](ai-service/README.md) - Service documentation
+- [AI Architecture](ai-service/ARCHITECTURE.md) - Architecture and governance
+- [AI Deployment](ai-service/DEPLOYMENT.md) - Deployment guide
+- [AI Quick Start](ai-service/QUICK_START.md) - 5-minute quick start
 
 ---
 
@@ -568,7 +577,23 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 
 ### Phase 3: Intelligence Layer (Weeks 9-12)
 
-- [ ] AI service infrastructure
+#### ✅ Task 3.1.1: Setup Python FastAPI service for AI inference - COMPLETED
+- ✅ FastAPI service deployed as separate microservice
+- ✅ Docker container with Python 3.11+, scikit-learn, XGBoost, sentence-transformers
+- ✅ Health check endpoint: GET `/health`
+- ✅ API documentation: OpenAPI 3.0 spec auto-generated
+- ✅ Isolated from System of Record (no direct database write access)
+- ✅ 5 unit tests passing
+
+#### ✅ Task 3.1.2: Implement AI governance framework - COMPLETED
+- ✅ All AI outputs tagged with confidence scores (0.0 - 1.0)
+- ✅ Explainability metadata included (SHAP values, reason codes)
+- ✅ Human-in-the-Loop (HITL) approval required for critical operations
+- ✅ AI Kill Switch: SuperAdmin can disable all AI services globally
+- ✅ Audit log: all AI predictions and human decisions recorded
+- ✅ 21 unit tests passing (16 governance + 5 main)
+
+- [ ] Identity resolution (duplicate detection)
 - [ ] Identity resolution (duplicate detection)
 - [ ] Merge operations with governance
 - [ ] Human-in-the-loop workflows
@@ -697,6 +722,6 @@ Built with:
 
 ---
 
-**Project Status:** Phase 1 Complete ✅ | Phase 2 In Progress (8/14 tasks)  
-**Next Milestone:** Task 2.3.1 - Build Offline-First Mobile Attendance Module  
-**Last Updated:** 2026-02-05
+**Project Status:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 In Progress (3/11 tasks)  
+**Next Milestone:** Task 3.2.2 - Integrate Sentence-BERT for Semantic Matching  
+**Last Updated:** 2026-02-07

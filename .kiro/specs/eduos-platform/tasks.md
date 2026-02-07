@@ -222,7 +222,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
 
 ### 3.1 AI Service Infrastructure
 
-- [ ] 3.1.1 Setup Python FastAPI service for AI inference
+- [x] 3.1.1 Setup Python FastAPI service for AI inference
   - **Definition of Done:**
     - FastAPI service deployed as separate microservice
     - Docker container with Python 3.10+, scikit-learn, XGBoost, sentence-transformers
@@ -231,7 +231,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - Isolated from System of Record (no direct database write access)
 
 
-- [ ] 3.1.2 Implement AI governance framework
+- [x] 3.1.2 Implement AI governance framework
   - **Definition of Done:**
     - All AI outputs tagged with confidence scores (0.0 - 1.0)
     - Explainability metadata included (SHAP values, reason codes)
@@ -241,7 +241,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
 
 ### 3.2 Identity Resolution (Duplicate Detection)
 
-- [ ] 3.2.1 Build deterministic fuzzy matching layer
+- [x] 3.2.1 Build deterministic fuzzy matching layer
   - **Definition of Done:**
     - Levenshtein distance algorithm for name matching
     - Scoring formula: 0.4×first_name + 0.4×last_name + 0.2×DOB_match

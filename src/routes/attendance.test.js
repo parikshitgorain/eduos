@@ -239,6 +239,18 @@ describe('Attendance Routes', () => {
       expect(response.body.records).toEqual([]);
     });
 
+    it('should respect Accept-Timezone header', async () => {
+      mockDb.query.mockResolvedValue({ rows: [] });
+
+      const response = await request(app)
+        .get('/api/v1/attendance/session/00000000-0000-0000-0000-000000000000')
+        .set('Accept-Timezone', 'Asia/Kolkata')
+        .expect(200);
+
+      expect(response.body.status).toBe('success');
+      expect(response.body.timezone).toBe('Asia/Kolkata');
+    });
+
     it('should handle database errors', async () => {
       mockDb.query.mockRejectedValue(new Error('Database connection failed'));
 
@@ -324,6 +336,321 @@ describe('Attendance Routes', () => {
     });
   });
 
+  describe('GET /api/v1/attendance/reports/student/:studentId', () => {
+    it('should return attendance rate for a student', async () => {
+      const mockReport = {
+        student_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+        total_sessions: 20,
+        present: 18,
+        absent: 2,
+        late: 0,
+        attendance_rate: 90.0
+      };
+
+      mockDb.query.mockResolvedValue({ rows: [mockReport] });
+
+      const response = await request(app)
+        .get('/api/v1/attendance/reports/student/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11')
+        .expect(200);
+
+      expect(response.body.status).toBe('success');
+      expect(response.body.report).toBeDefined();
+    });
+
+    it('should return 400 for invalid student ID', async () => {
+      const response = await request(app)
+        .get('/api/v1/attendance/reports/student/invalid-uuid')
+        .expect(400);
+
+      expect(response.body.status).toBe('error');
+      expect(response.body.errors).toBeDefined();
+    });
+
+    it('should use custom date range if provided', async () => {
+      mockDb.query.mockResolvedValue({ rows: [{ attendance_rate: 85.0 }] });
+
+      await request(app)
+        .get('/api/v1/attendance/reports/student/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11')
+        .query({ startDate: '2026-01-01', endDate: '2026-01-31' })
+        .expect(200);
+
+      expect(mockDb.query).toHaveBeenCalled();
+    });
+
+    it('should handle database errors', async () => {
+      mockDb.query.mockRejectedValue(new Error('Database error'));
+
+      const response = await request(app)
+        .get('/api/v1/attendance/reports/student/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11')
+        .expect(500);
+
+      expect(response.body.status).toBe('error');
+    });
+  });
+
+  describe('POST /api/v1/attendance/reports/generate', () => {
+    it('should generate attendance report with valid parameters', async () => {
+      const mockReport = {
+        reportType: 'daily',
+        data: [{ date: '2026-02-04', present: 50, absent: 5 }]
+      };
+
+      mockDb.query.mockResolvedValue({ rows: [mockReport] });
+
+      const response = await request(app)
+        .post('/api/v1/attendance/reports/generate')
+        .send({
+          reportType: 'daily',
+          startDate: '2026-02-01T00:00:00Z',
+          endDate: '2026-02-07T23:59:59Z'
+        })
+        .expect(200);
+
+      expect(response.body.status).toBe('success');
+      expect(response.body.report).toBeDefined();
+    });
+
+    it('should return 400 for invalid report type', async () => {
+      const response = await request(app)
+        .post('/api/v1/attendance/reports/generate')
+        .send({
+          reportType: 'invalid-type'
+        })
+        .expect(400);
+
+      expect(response.body.status).toBe('error');
+      expect(response.body.errors).toBeDefined();
+    });
+
+    it('should return 400 for invalid date format', async () => {
+      const response = await request(app)
+        .post('/api/v1/attendance/reports/generate')
+        .send({
+          reportType: 'daily',
+          startDate: 'invalid-date'
+        })
+        .expect(400);
+
+      expect(response.body.status).toBe('error');
+    });
+
+    it('should return 400 for invalid format', async () => {
+      const response = await request(app)
+        .post('/api/v1/attendance/reports/generate')
+        .send({
+          reportType: 'daily',
+          format: 'xml'
+        })
+        .expect(400);
+
+      expect(response.body.status).toBe('error');
+    });
+
+    it('should generate CSV report when format is csv', async () => {
+      const mockReport = {
+        data: [{ date: '2026-02-04', present: 50, absent: 5 }]
+      };
+
+      mockDb.query.mockResolvedValue({ rows: [mockReport] });
+
+      const response = await request(app)
+        .post('/api/v1/attendance/reports/generate')
+        .send({
+          reportType: 'daily',
+          format: 'csv'
+        })
+        .expect(200);
+
+      expect(response.headers['content-type']).toContain('text/csv');
+      expect(response.headers['content-disposition']).toContain('attachment');
+    });
+
+    it('should handle optional filters', async () => {
+      mockDb.query.mockResolvedValue({ rows: [] });
+
+      await request(app)
+        .post('/api/v1/attendance/reports/generate')
+        .send({
+          reportType: 'custom',
+          batchId: 'batch-123',
+          studentIds: ['student-1', 'student-2']
+        })
+        .expect(200);
+
+      expect(mockDb.query).toHaveBeenCalled();
+    });
+
+    it('should handle database errors', async () => {
+      mockDb.query.mockRejectedValue(new Error('Database error'));
+
+      const response = await request(app)
+        .post('/api/v1/attendance/reports/generate')
+        .send({
+          reportType: 'daily'
+        })
+        .expect(500);
+
+      expect(response.body.status).toBe('error');
+    });
+  });
+
+  describe('GET /api/v1/attendance/reports/daily', () => {
+    it('should return daily attendance summary', async () => {
+      const mockReport = {
+        date: '2026-02-04',
+        total_students: 100,
+        present: 90,
+        absent: 8,
+        late: 2
+      };
+
+      mockDb.query.mockResolvedValue({ rows: [mockReport] });
+
+      const response = await request(app)
+        .get('/api/v1/attendance/reports/daily')
+        .expect(200);
+
+      expect(response.body.status).toBe('success');
+      expect(response.body.report).toBeDefined();
+    });
+
+    it('should use custom date if provided', async () => {
+      mockDb.query.mockResolvedValue({ rows: [] });
+
+      await request(app)
+        .get('/api/v1/attendance/reports/daily')
+        .query({ date: '2026-02-01' })
+        .expect(200);
+
+      expect(mockDb.query).toHaveBeenCalled();
+    });
+
+    it('should filter by batch ID if provided', async () => {
+      mockDb.query.mockResolvedValue({ rows: [] });
+
+      await request(app)
+        .get('/api/v1/attendance/reports/daily')
+        .query({ batchId: 'batch-123' })
+        .expect(200);
+
+      expect(mockDb.query).toHaveBeenCalled();
+    });
+
+    it('should handle database errors', async () => {
+      mockDb.query.mockRejectedValue(new Error('Database error'));
+
+      const response = await request(app)
+        .get('/api/v1/attendance/reports/daily')
+        .expect(500);
+
+      expect(response.body.status).toBe('error');
+    });
+  });
+
+  describe('GET /api/v1/attendance/reports/weekly', () => {
+    it('should return weekly attendance summary', async () => {
+      const mockReport = {
+        week_start: '2026-02-02',
+        week_end: '2026-02-08',
+        total_students: 100,
+        average_attendance: 92.5
+      };
+
+      mockDb.query.mockResolvedValue({ rows: [mockReport] });
+
+      const response = await request(app)
+        .get('/api/v1/attendance/reports/weekly')
+        .expect(200);
+
+      expect(response.body.status).toBe('success');
+      expect(response.body.report).toBeDefined();
+    });
+
+    it('should use custom week start if provided', async () => {
+      mockDb.query.mockResolvedValue({ rows: [] });
+
+      await request(app)
+        .get('/api/v1/attendance/reports/weekly')
+        .query({ weekStart: '2026-02-01' })
+        .expect(200);
+
+      expect(mockDb.query).toHaveBeenCalled();
+    });
+
+    it('should filter by batch ID if provided', async () => {
+      mockDb.query.mockResolvedValue({ rows: [] });
+
+      await request(app)
+        .get('/api/v1/attendance/reports/weekly')
+        .query({ batchId: 'batch-123' })
+        .expect(200);
+
+      expect(mockDb.query).toHaveBeenCalled();
+    });
+
+    it('should handle database errors', async () => {
+      mockDb.query.mockRejectedValue(new Error('Database error'));
+
+      const response = await request(app)
+        .get('/api/v1/attendance/reports/weekly')
+        .expect(500);
+
+      expect(response.body.status).toBe('error');
+    });
+  });
+
+  describe('GET /api/v1/attendance/reports/monthly', () => {
+    it('should return monthly attendance summary', async () => {
+      const mockReport = {
+        year: 2026,
+        month: 2,
+        total_students: 100,
+        average_attendance: 91.0
+      };
+
+      mockDb.query.mockResolvedValue({ rows: [mockReport] });
+
+      const response = await request(app)
+        .get('/api/v1/attendance/reports/monthly')
+        .expect(200);
+
+      expect(response.body.status).toBe('success');
+      expect(response.body.report).toBeDefined();
+    });
+
+    it('should use custom year and month if provided', async () => {
+      mockDb.query.mockResolvedValue({ rows: [] });
+
+      await request(app)
+        .get('/api/v1/attendance/reports/monthly')
+        .query({ year: 2025, month: 12 })
+        .expect(200);
+
+      expect(mockDb.query).toHaveBeenCalled();
+    });
+
+    it('should filter by batch ID if provided', async () => {
+      mockDb.query.mockResolvedValue({ rows: [] });
+
+      await request(app)
+        .get('/api/v1/attendance/reports/monthly')
+        .query({ batchId: 'batch-123' })
+        .expect(200);
+
+      expect(mockDb.query).toHaveBeenCalled();
+    });
+
+    it('should handle database errors', async () => {
+      mockDb.query.mockRejectedValue(new Error('Database error'));
+
+      const response = await request(app)
+        .get('/api/v1/attendance/reports/monthly')
+        .expect(500);
+
+      expect(response.body.status).toBe('error');
+    });
+  });
+
   describe('Tenant Isolation', () => {
     it('should require tenant ID for all endpoints', async () => {
       // Create app without tenant ID
@@ -388,6 +715,92 @@ describe('Attendance Routes', () => {
 
       const response = await request(appNoTenant)
         .get('/api/v1/attendance/conflicts')
+        .expect(400);
+
+      expect(response.body.message).toContain('Tenant ID is required');
+    });
+
+    it('should require tenant ID for student report endpoint', async () => {
+      const appNoTenant = express();
+      appNoTenant.use(express.json());
+      appNoTenant.use((req, res, next) => {
+        req.db = mockDb;
+        req.redis = mockRedis;
+        next();
+      });
+      appNoTenant.use('/api/v1/attendance', attendanceRoutes);
+
+      const response = await request(appNoTenant)
+        .get('/api/v1/attendance/reports/student/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11')
+        .expect(400);
+
+      expect(response.body.message).toContain('Tenant ID is required');
+    });
+
+    it('should require tenant ID for generate report endpoint', async () => {
+      const appNoTenant = express();
+      appNoTenant.use(express.json());
+      appNoTenant.use((req, res, next) => {
+        req.db = mockDb;
+        req.redis = mockRedis;
+        next();
+      });
+      appNoTenant.use('/api/v1/attendance', attendanceRoutes);
+
+      const response = await request(appNoTenant)
+        .post('/api/v1/attendance/reports/generate')
+        .send({ reportType: 'daily' })
+        .expect(400);
+
+      expect(response.body.message).toContain('Tenant ID is required');
+    });
+
+    it('should require tenant ID for daily report endpoint', async () => {
+      const appNoTenant = express();
+      appNoTenant.use(express.json());
+      appNoTenant.use((req, res, next) => {
+        req.db = mockDb;
+        req.redis = mockRedis;
+        next();
+      });
+      appNoTenant.use('/api/v1/attendance', attendanceRoutes);
+
+      const response = await request(appNoTenant)
+        .get('/api/v1/attendance/reports/daily')
+        .expect(400);
+
+      expect(response.body.message).toContain('Tenant ID is required');
+    });
+
+    it('should require tenant ID for weekly report endpoint', async () => {
+      const appNoTenant = express();
+      appNoTenant.use(express.json());
+      appNoTenant.use((req, res, next) => {
+        req.db = mockDb;
+        req.redis = mockRedis;
+        next();
+      });
+      appNoTenant.use('/api/v1/attendance', attendanceRoutes);
+
+      const response = await request(appNoTenant)
+        .get('/api/v1/attendance/reports/weekly')
+        .expect(400);
+
+      expect(response.body.message).toContain('Tenant ID is required');
+    });
+
+    it('should require tenant ID for monthly report endpoint', async () => {
+      const appNoTenant = express();
+      appNoTenant.use(express.json());
+      appNoTenant.use((req, res, next) => {
+        req.db = mockDb;
+        req.redis = mockRedis;
+        next();
+      });
+      appNoTenant.use('/api/v1/attendance', attendanceRoutes);
+
+      const response = await request(appNoTenant)
+        .get('/api/v1/attendance/reports/monthly')
         .expect(400);
 
       expect(response.body.message).toContain('Tenant ID is required');

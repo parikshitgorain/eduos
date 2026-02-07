@@ -69,6 +69,27 @@ describe('Schema Integrity Check Job', () => {
       expect(result.failed_count).toBe(1);
     });
 
+    it('should handle verification errors', async () => {
+      const mockSnapshots = [{ snapshot_id: 'snap-1' }];
+
+      query
+        .mockResolvedValueOnce({ rows: mockSnapshots })
+        .mockResolvedValueOnce({ rows: [{ check_id: 'check-123' }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      schemaService.verifySchemaIntegritySystem.mockRejectedValue(new Error('Verification failed'));
+
+      const result = await schemaIntegrityCheckJob.runIntegrityCheck();
+
+      expect(result.success).toBe(false);
+      expect(result.failed_count).toBe(1);
+      expect(result.failed_snapshots).toContain('snap-1');
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to verify snapshot snap-1'),
+        'Verification failed'
+      );
+    });
+
     it('should handle empty snapshot list', async () => {
       query
         .mockResolvedValueOnce({ rows: [] })
@@ -85,6 +106,19 @@ describe('Schema Integrity Check Job', () => {
       query.mockRejectedValueOnce(new Error('Database error'));
 
       await expect(schemaIntegrityCheckJob.runIntegrityCheck()).rejects.toThrow('Database error');
+    });
+
+    it('should handle error logging failure', async () => {
+      query
+        .mockRejectedValueOnce(new Error('Database error'))
+        .mockRejectedValueOnce(new Error('Logging failed'));
+
+      await expect(schemaIntegrityCheckJob.runIntegrityCheck()).rejects.toThrow('Database error');
+      
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to log error'),
+        'Logging failed'
+      );
     });
   });
 
@@ -142,6 +176,54 @@ describe('Schema Integrity Check Job', () => {
         expect.objectContaining({ scheduled: true })
       );
       expect(result).toBe(mockTask);
+    });
+
+    it('should execute scheduled check successfully', async () => {
+      const mockTask = { stop: jest.fn() };
+      let scheduledCallback;
+      
+      cron.schedule.mockImplementation((expr, callback, options) => {
+        scheduledCallback = callback;
+        return mockTask;
+      });
+
+      // Mock successful check
+      query
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ check_id: 'check-123' }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      schemaIntegrityCheckJob.scheduleNightlyCheck();
+
+      // Execute the scheduled callback
+      await scheduledCallback();
+
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining('Running scheduled integrity check')
+      );
+    });
+
+    it('should handle scheduled check errors', async () => {
+      const mockTask = { stop: jest.fn() };
+      let scheduledCallback;
+      
+      cron.schedule.mockImplementation((expr, callback, options) => {
+        scheduledCallback = callback;
+        return mockTask;
+      });
+
+      // Mock failed check
+      query.mockRejectedValue(new Error('Scheduled check failed'));
+
+      schemaIntegrityCheckJob.scheduleNightlyCheck();
+
+      // Execute the scheduled callback
+      await scheduledCallback();
+
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining('Scheduled check failed'),
+        'Scheduled check failed'
+      );
     });
 
     it('should start job', () => {
