@@ -138,6 +138,15 @@ app.use('/api/v1/schemas', schemaRoutes);
 // Field permissions routes (require tenant context)
 const fieldPermissionsRoutes = require('./routes/fieldPermissions');
 app.use('/api/v1', fieldPermissionsRoutes);
+
+// Student management routes (require tenant context)
+const studentRoutes = require('./routes/students');
+app.use('/api/v1/students', studentRoutes);
+
+// Duplicate review queue routes (require tenant context)
+const duplicateReviewQueueRoutes = require('./routes/duplicateReviewQueue');
+app.use('/api/v1/duplicate-review-queue', duplicateReviewQueueRoutes);
+
 app.get('/api/students', async (req, res) => {
   // RLS automatically filters by tenant_id
   const result = await req.dbClient.query(

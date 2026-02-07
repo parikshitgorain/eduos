@@ -266,7 +266,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - Unit tests: validate scoring edge cases (identical names, phonetic matches)
     - Integration test: end-to-end duplicate detection flow
 
-- [ ] 3.2.4 Build duplicate review queue UI
+- [x] 3.2.4 Build duplicate review queue UI
   - **Definition of Done:**
     - Admin dashboard displays flagged duplicate pairs
     - Side-by-side comparison view with highlighted differences
@@ -276,7 +276,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
 
 ### 3.3 Merge Operations with Governance
 
-- [ ] 3.3.1 Implement pre-merge cryptographic snapshots
+- [x] 3.3.1 Implement pre-merge cryptographic snapshots
   - **Definition of Done:**
     - Snapshot includes: primary record, secondary records, SHA-256 hash
     - Stored in append-only `merge_snapshots` table
@@ -285,7 +285,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - Retention: 7 years (Basic), 99 years (Enterprise)
 
 
-- [ ] 3.3.2 Build merge workflow with impact assessment
+- [x] 3.3.2 Build merge workflow with impact assessment
   - **Definition of Done:**
     - Admin selects primary and secondary records
     - System displays impact: enrollments, attendance, payments affected

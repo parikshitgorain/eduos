@@ -483,6 +483,7 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 - [Task 3.2.1](docs/tasks/TASK_3.2.1_IMPLEMENTATION_SUMMARY.md) - Deterministic Fuzzy Matching ✅
 - [Task 3.2.2](docs/tasks/TASK_3.2.2_IMPLEMENTATION_SUMMARY.md) - Sentence-BERT Semantic Matching ✅
 - [Task 3.2.3](docs/tasks/TASK_3.2.3_IMPLEMENTATION_SUMMARY.md) - Consolidated Duplicate Scoring System ✅
+- [Task 3.3.2](docs/tasks/TASK_3.3.2_IMPLEMENTATION_SUMMARY.md) - Merge Workflow with Impact Assessment ✅
 
 **Authentication:**
 - [Auth Service](docs/AUTH_SERVICE.md) - OAuth2/OIDC authentication service
@@ -538,7 +539,7 @@ All organizational structure, schema engine, and attendance tasks completed. See
 
 ### Phase 3: Intelligence Layer (Weeks 9-12) 🔄 IN PROGRESS
 
-**Status:** 5/11 tasks complete (45%)
+**Status:** 6/11 tasks complete (55%)
 
 **Completed:**
 - ✅ Task 3.1.1: Python FastAPI AI Service
@@ -546,10 +547,12 @@ All organizational structure, schema engine, and attendance tasks completed. See
 - ✅ Task 3.2.1: Deterministic Fuzzy Matching
 - ✅ Task 3.2.2: Sentence-BERT Semantic Matching
 - ✅ Task 3.2.3: Consolidated Duplicate Scoring System
+- ✅ Task 3.3.2: Merge Workflow with Impact Assessment
 
 **Next:**
 - Task 3.2.4: Build duplicate review queue UI
-- Task 3.3.x: Merge operations with governance
+- Task 3.3.1: Pre-merge cryptographic snapshots
+- Task 3.3.3: Merge audit trail and reversibility
 - Task 3.4.x: Human-in-the-loop workflows
 
 See [Project Status](#project-status) section above for detailed task breakdown.
@@ -648,6 +651,6 @@ Built with:
 
 ---
 
-**Project Status:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 In Progress (5/11 tasks)  
+**Project Status:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 In Progress (6/11 tasks)  
 **Next Milestone:** Task 3.2.4 - Build Duplicate Review Queue UI  
 **Last Updated:** 2026-02-07
