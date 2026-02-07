@@ -233,6 +233,34 @@ The EduOS Platform implements enterprise-grade security measures:
 | Password Reset | 3 requests | 1 hour |
 | MFA Verification | 10 attempts | 15 minutes |
 
+### Multi-Tenant Isolation
+
+- Database-level RLS policies
+- Tenant context validation
+- Cross-tenant access prevention
+- Audit logging for all operations
+
+### Authentication & Authorization
+
+- OAuth 2.0 / OIDC
+- Multi-factor authentication (MFA)
+- Role-Based Access Control (RBAC)
+- Field-level permissions
+
+### Data Protection
+
+- Encryption at rest (AES-256)
+- Encryption in transit (TLS 1.3)
+- Cryptographic audit trails (SHA-256)
+- Immutable snapshots for critical data
+
+### Compliance
+
+- GDPR compliance
+- FERPA compliance (US education data)
+- Data retention policies
+- Right to be forgotten
+
 For detailed security information, see:
 - [Security Guide](docs/SECURITY.md)
 - [Security Fixes Report](docs/SECURITY_FIXES_REPORT.md)
@@ -561,38 +589,6 @@ See [Project Status](#project-status) section above for detailed task breakdown.
 | **Storage** | S3-compatible | Media and documents |
 | **Orchestration** | Kubernetes | Container management |
 | **Monitoring** | Prometheus + Grafana | Metrics and alerting |
-
----
-
-## Security
-
-### Multi-Tenant Isolation
-
-- Database-level RLS policies
-- Tenant context validation
-- Cross-tenant access prevention
-- Audit logging for all operations
-
-### Authentication & Authorization
-
-- OAuth 2.0 / OIDC
-- Multi-factor authentication (MFA)
-- Role-Based Access Control (RBAC)
-- Field-level permissions
-
-### Data Protection
-
-- Encryption at rest (AES-256)
-- Encryption in transit (TLS 1.3)
-- Cryptographic audit trails (SHA-256)
-- Immutable snapshots for critical data
-
-### Compliance
-
-- GDPR compliance
-- FERPA compliance (US education data)
-- Data retention policies
-- Right to be forgotten
 
 ---
 
