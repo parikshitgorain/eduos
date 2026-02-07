@@ -75,7 +75,9 @@ database/
    ├── 022_security_monitoring.sql            # Security monitoring ✅
    ├── 022_security_monitoring_rollback.sql   # Security monitoring rollback
    ├── 023_backup_system.sql                  # Backup and disaster recovery ✅
-   └── 023_backup_system_rollback.sql         # Backup system rollback
+   ├── 023_backup_system_rollback.sql         # Backup system rollback
+   ├── 024_performance_indexes.sql            # Performance optimization ✅
+   └── 024_performance_indexes_rollback.sql   # Performance indexes rollback
 ├── tests/                              # Test suites
 │   └── rls_isolation.test.sql         # RLS isolation tests
 └── docs/                               # Documentation
