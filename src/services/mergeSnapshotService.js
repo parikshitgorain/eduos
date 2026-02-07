@@ -163,10 +163,16 @@ async function getSnapshot(snapshotId, tenantId) {
   const client = await pool.connect();
   
   try {
+    // Validate UUID format to prevent SQL injection
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(tenantId)) {
+      throw new Error('Invalid tenant ID format');
+    }
+    
     // Begin transaction for RLS context
     await client.query('BEGIN');
     
-    // Set tenant context for RLS
+    // Set tenant context for RLS (must use string interpolation for SET command)
     await client.query(`SET LOCAL app.current_tenant_id = '${tenantId}'`);
     
     const result = await client.query(
