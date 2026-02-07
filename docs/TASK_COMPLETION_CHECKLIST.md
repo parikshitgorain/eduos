@@ -156,7 +156,7 @@ Complete infrastructure task [X.X.X]:
 ### Before Saying "Task Complete"
 
 - [ ] All tests passing (npm test)
-- [ ] Code coverage > 80%
+- [ ] Code coverage > 90%
 - [ ] All acceptance criteria met
 - [ ] Error handling tested
 - [ ] Performance targets met

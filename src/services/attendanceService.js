@@ -60,6 +60,14 @@ class AttendanceService {
     if (!event.client_ts) errors.push('client_ts is required');
     if (!event.data) errors.push('data is required');
     
+    // Validate timestamp is not in the future
+    if (event.client_ts) {
+      const timestampValidation = this.validateTimestamp(event.client_ts);
+      if (!timestampValidation.valid) {
+        errors.push(`Invalid timestamp: ${timestampValidation.error}`);
+      }
+    }
+    
     if (event.data) {
       if (!event.data.student_id) errors.push('data.student_id is required');
       if (!event.data.session_id) errors.push('data.session_id is required');
@@ -84,6 +92,69 @@ class AttendanceService {
    */
   normalizeTimestamp(clientTs) {
     return new Date(clientTs);
+  }
+
+  /**
+   * Validate timestamp is not in the future
+   * @param {string} clientTs - Client timestamp
+   * @param {number} toleranceMs - Tolerance in milliseconds (default: 5 minutes)
+   * @returns {Object} Validation result
+   */
+  validateTimestamp(clientTs, toleranceMs = 300000) {
+    const timestamp = new Date(clientTs);
+    const now = new Date();
+    const maxAllowed = new Date(now.getTime() + toleranceMs);
+
+    if (timestamp > maxAllowed) {
+      return {
+        valid: false,
+        error: 'Timestamp is in the future',
+        timestamp: timestamp.toISOString(),
+        maxAllowed: maxAllowed.toISOString()
+      };
+    }
+
+    return { valid: true };
+  }
+
+  /**
+   * Convert UTC timestamp to client timezone
+   * @param {Date} utcTimestamp - UTC timestamp
+   * @param {string} timezone - IANA timezone (e.g., 'Asia/Kolkata')
+   * @returns {string} ISO 8601 string in client timezone
+   */
+  convertToClientTimezone(utcTimestamp, timezone) {
+    if (!timezone) {
+      return utcTimestamp.toISOString();
+    }
+
+    try {
+      // Use Intl.DateTimeFormat for timezone conversion
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+
+      const parts = formatter.formatToParts(utcTimestamp);
+      const dateParts = {};
+      parts.forEach(part => {
+        if (part.type !== 'literal') {
+          dateParts[part.type] = part.value;
+        }
+      });
+
+      // Construct ISO 8601 string
+      return `${dateParts.year}-${dateParts.month}-${dateParts.day}T${dateParts.hour}:${dateParts.minute}:${dateParts.second}`;
+    } catch (error) {
+      // Fallback to UTC if timezone conversion fails
+      return utcTimestamp.toISOString();
+    }
   }
 
   /**
@@ -393,9 +464,10 @@ class AttendanceService {
    * Get attendance records for a session
    * @param {string} sessionId - Session UUID
    * @param {string} tenantId - Tenant UUID
+   * @param {string} timezone - Optional IANA timezone for timestamp conversion
    * @returns {Promise<Array>} Attendance records
    */
-  async getSessionAttendance(sessionId, tenantId) {
+  async getSessionAttendance(sessionId, tenantId, timezone = null) {
     const query = `
       SELECT 
         event_id,
@@ -416,6 +488,16 @@ class AttendanceService {
     `;
 
     const result = await this.db.query(query, [sessionId, tenantId]);
+    
+    // Convert timestamps to client timezone if requested
+    if (timezone) {
+      return result.rows.map(record => ({
+        ...record,
+        marked_at_client: this.convertToClientTimezone(record.marked_at_utc, timezone),
+        marked_at_utc: record.marked_at_utc.toISOString()
+      }));
+    }
+    
     return result.rows;
   }
 
@@ -444,6 +526,264 @@ class AttendanceService {
 
     const result = await this.db.query(query, [tenantId, limit]);
     return result.rows;
+  }
+
+  /**
+   * Calculate attendance rate for a student
+   * @param {string} studentId - Student UUID
+   * @param {string} tenantId - Tenant UUID
+   * @param {Date} startDate - Start date for calculation
+   * @param {Date} endDate - End date for calculation
+   * @returns {Promise<Object>} Attendance statistics
+   */
+  async calculateAttendanceRate(studentId, tenantId, startDate, endDate) {
+    const query = `
+      SELECT 
+        COUNT(*) as total_sessions,
+        COUNT(CASE WHEN status = 'present' THEN 1 END) as present_count,
+        COUNT(CASE WHEN status = 'absent' THEN 1 END) as absent_count,
+        COUNT(CASE WHEN status = 'late' THEN 1 END) as late_count
+      FROM attendance_records
+      WHERE student_id = $1 
+        AND tenant_id = $2
+        AND marked_at_utc >= $3
+        AND marked_at_utc <= $4
+    `;
+
+    const result = await this.db.query(query, [studentId, tenantId, startDate, endDate]);
+    const stats = result.rows[0];
+
+    const totalSessions = parseInt(stats.total_sessions);
+    const presentCount = parseInt(stats.present_count);
+    const lateCount = parseInt(stats.late_count);
+
+    // Calculate attendance rate: (present + late) / total × 100
+    const attendanceRate = totalSessions > 0 
+      ? ((presentCount + lateCount) / totalSessions * 100).toFixed(2)
+      : 0;
+
+    return {
+      student_id: studentId,
+      period: {
+        start: startDate.toISOString(),
+        end: endDate.toISOString()
+      },
+      total_sessions: totalSessions,
+      present: presentCount,
+      absent: parseInt(stats.absent_count),
+      late: lateCount,
+      attendance_rate: parseFloat(attendanceRate)
+    };
+  }
+
+  /**
+   * Generate attendance report for multiple students
+   * @param {Object} filters - Report filters
+   * @param {string} filters.tenantId - Tenant UUID
+   * @param {Array<string>} filters.studentIds - Optional array of student IDs
+   * @param {string} filters.batchId - Optional batch ID
+   * @param {string} filters.programId - Optional program ID
+   * @param {Date} filters.startDate - Start date
+   * @param {Date} filters.endDate - End date
+   * @param {string} filters.reportType - Report type: 'daily', 'weekly', 'monthly', 'custom'
+   * @returns {Promise<Object>} Attendance report
+   */
+  async generateAttendanceReport(filters) {
+    const { tenantId, studentIds, batchId, programId, startDate, endDate, reportType = 'custom' } = filters;
+
+    // Build dynamic query based on filters
+    let whereConditions = ['ar.tenant_id = $1'];
+    let queryParams = [tenantId];
+    let paramIndex = 2;
+
+    if (studentIds && studentIds.length > 0) {
+      whereConditions.push(`ar.student_id = ANY($${paramIndex})`);
+      queryParams.push(studentIds);
+      paramIndex++;
+    }
+
+    if (batchId) {
+      whereConditions.push(`ar.batch_id = $${paramIndex}`);
+      queryParams.push(batchId);
+      paramIndex++;
+    }
+
+    if (startDate) {
+      whereConditions.push(`ar.marked_at_utc >= $${paramIndex}`);
+      queryParams.push(startDate);
+      paramIndex++;
+    }
+
+    if (endDate) {
+      whereConditions.push(`ar.marked_at_utc <= $${paramIndex}`);
+      queryParams.push(endDate);
+      paramIndex++;
+    }
+
+    const query = `
+      SELECT 
+        ar.student_id,
+        COUNT(*) as total_sessions,
+        COUNT(CASE WHEN ar.status = 'present' THEN 1 END) as present_count,
+        COUNT(CASE WHEN ar.status = 'absent' THEN 1 END) as absent_count,
+        COUNT(CASE WHEN ar.status = 'late' THEN 1 END) as late_count,
+        MIN(ar.marked_at_utc) as first_attendance,
+        MAX(ar.marked_at_utc) as last_attendance
+      FROM attendance_records ar
+      WHERE ${whereConditions.join(' AND ')}
+      GROUP BY ar.student_id
+      ORDER BY ar.student_id
+    `;
+
+    const result = await this.db.query(query, queryParams);
+
+    // Calculate attendance rates for each student
+    const studentReports = result.rows.map(row => {
+      const totalSessions = parseInt(row.total_sessions);
+      const presentCount = parseInt(row.present_count);
+      const lateCount = parseInt(row.late_count);
+      const attendanceRate = totalSessions > 0 
+        ? ((presentCount + lateCount) / totalSessions * 100).toFixed(2)
+        : 0;
+
+      return {
+        student_id: row.student_id,
+        total_sessions: totalSessions,
+        present: presentCount,
+        absent: parseInt(row.absent_count),
+        late: lateCount,
+        attendance_rate: parseFloat(attendanceRate),
+        first_attendance: row.first_attendance,
+        last_attendance: row.last_attendance
+      };
+    });
+
+    // Calculate aggregate statistics
+    const totalStudents = studentReports.length;
+    const avgAttendanceRate = totalStudents > 0
+      ? (studentReports.reduce((sum, s) => sum + s.attendance_rate, 0) / totalStudents).toFixed(2)
+      : 0;
+
+    return {
+      report_type: reportType,
+      period: {
+        start: startDate ? startDate.toISOString() : null,
+        end: endDate ? endDate.toISOString() : null
+      },
+      filters: {
+        batch_id: batchId || null,
+        program_id: programId || null,
+        student_count: totalStudents
+      },
+      summary: {
+        total_students: totalStudents,
+        average_attendance_rate: parseFloat(avgAttendanceRate)
+      },
+      students: studentReports,
+      generated_at: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Export attendance report to CSV format
+   * @param {Object} report - Attendance report data
+   * @returns {string} CSV formatted string
+   */
+  exportToCSV(report) {
+    const headers = [
+      'Student ID',
+      'Total Sessions',
+      'Present',
+      'Absent',
+      'Late',
+      'Attendance Rate (%)',
+      'First Attendance',
+      'Last Attendance'
+    ];
+
+    const rows = report.students.map(student => [
+      student.student_id,
+      student.total_sessions,
+      student.present,
+      student.absent,
+      student.late,
+      student.attendance_rate,
+      student.first_attendance || 'N/A',
+      student.last_attendance || 'N/A'
+    ]);
+
+    // Build CSV string
+    const csvLines = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ];
+
+    return csvLines.join('\n');
+  }
+
+  /**
+   * Get daily attendance summary
+   * @param {string} tenantId - Tenant UUID
+   * @param {Date} date - Date for daily report
+   * @param {string} batchId - Optional batch ID filter
+   * @returns {Promise<Object>} Daily attendance summary
+   */
+  async getDailyAttendanceSummary(tenantId, date, batchId = null) {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    return this.generateAttendanceReport({
+      tenantId,
+      batchId,
+      startDate: startOfDay,
+      endDate: endOfDay,
+      reportType: 'daily'
+    });
+  }
+
+  /**
+   * Get weekly attendance summary
+   * @param {string} tenantId - Tenant UUID
+   * @param {Date} weekStartDate - Start of week
+   * @param {string} batchId - Optional batch ID filter
+   * @returns {Promise<Object>} Weekly attendance summary
+   */
+  async getWeeklyAttendanceSummary(tenantId, weekStartDate, batchId = null) {
+    const endOfWeek = new Date(weekStartDate);
+    endOfWeek.setDate(endOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    return this.generateAttendanceReport({
+      tenantId,
+      batchId,
+      startDate: weekStartDate,
+      endDate: endOfWeek,
+      reportType: 'weekly'
+    });
+  }
+
+  /**
+   * Get monthly attendance summary
+   * @param {string} tenantId - Tenant UUID
+   * @param {number} year - Year
+   * @param {number} month - Month (1-12)
+   * @param {string} batchId - Optional batch ID filter
+   * @returns {Promise<Object>} Monthly attendance summary
+   */
+  async getMonthlyAttendanceSummary(tenantId, year, month, batchId = null) {
+    const startOfMonth = new Date(year, month - 1, 1);
+    const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+
+    return this.generateAttendanceReport({
+      tenantId,
+      batchId,
+      startDate: startOfMonth,
+      endDate: endOfMonth,
+      reportType: 'monthly'
+    });
   }
 }
 

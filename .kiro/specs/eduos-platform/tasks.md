@@ -191,7 +191,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - UI: bulk attendance marking (select all, mark present/absent)
     - Local validation: prevent duplicate entries
 
-- [ ] 2.3.2 Implement idempotent sync engine
+- [x] 2.3.2 Implement idempotent sync engine
   - **Definition of Done:**
     - Sync API: POST `/api/v1/attendance/sync` with idempotency key
     - Idempotency key format: `event_id + device_id`
@@ -200,7 +200,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - Sync status tracking: pending, synced, failed
 
 
-- [ ] 2.3.3 Create timezone normalization system
+- [x] 2.3.3 Create timezone normalization system
   - **Definition of Done:**
     - Client timestamps preserved in audit logs
     - Server normalizes all timestamps to UTC
@@ -208,7 +208,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - API returns timestamps in client timezone (Accept-Timezone header)
     - Validation: detect impossible timestamps (future dates)
 
-- [ ] 2.3.4 Build attendance reporting and analytics
+- [x] 2.3.4 Build attendance reporting and analytics
   - **Definition of Done:**
     - Attendance rate calculation: (present days / total days) × 100
     - Reports: daily, weekly, monthly, custom date range
