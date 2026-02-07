@@ -147,6 +147,10 @@ app.use('/api/v1/students', studentRoutes);
 const duplicateReviewQueueRoutes = require('./routes/duplicateReviewQueue');
 app.use('/api/v1/duplicate-review-queue', duplicateReviewQueueRoutes);
 
+// Merge operations routes (require tenant context)
+const mergeRoutes = require('./routes/merges');
+app.use('/api/v1/merges', mergeRoutes);
+
 app.get('/api/students', async (req, res) => {
   // RLS automatically filters by tenant_id
   const result = await req.dbClient.query(

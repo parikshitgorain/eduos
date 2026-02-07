@@ -109,6 +109,8 @@ eduos-platform/
 | Document | Description | Audience |
 |----------|-------------|----------|
 | [Tenant Provisioning API](TENANT_PROVISIONING_API.md) | Complete API reference | Developers |
+| [Merge Operations API](MERGE_API.md) | Merge and restore operations | Developers |
+| [Duplicate Review Queue](DUPLICATE_REVIEW_QUEUE.md) | Duplicate detection and review | Developers |
 | [src/routes/tenants.js](../src/routes/tenants.js) | API implementation | Developers |
 | [src/services/tenantService.js](../src/services/tenantService.js) | Business logic | Developers |
 
@@ -157,7 +159,10 @@ eduos-platform/
 | [Task 3.2.1](tasks/TASK_3.2.1_IMPLEMENTATION_SUMMARY.md) | Deterministic Fuzzy Matching | ✅ Complete |
 | [Task 3.2.2](tasks/TASK_3.2.2_IMPLEMENTATION_SUMMARY.md) | Sentence-BERT Semantic Matching | ✅ Complete |
 | [Task 3.2.3](tasks/TASK_3.2.3_IMPLEMENTATION_SUMMARY.md) | Consolidated Duplicate Scoring System | ✅ Complete |
+| [Task 3.2.4](tasks/TASK_3.2.4_IMPLEMENTATION_SUMMARY.md) | Duplicate Review Queue UI | ✅ Complete |
+| [Task 3.3.1](tasks/TASK_3.3.1_IMPLEMENTATION_SUMMARY.md) | Pre-merge Cryptographic Snapshots | ✅ Complete |
 | [Task 3.3.2](tasks/TASK_3.3.2_IMPLEMENTATION_SUMMARY.md) | Merge Workflow with Impact Assessment | ✅ Complete |
+| [Task 3.3.3](tasks/TASK_3.3.3_IMPLEMENTATION_SUMMARY.md) | Merge Audit Trail and Reversibility | ✅ Complete |
 | [Security Hardening](tasks/SECURITY_HARDENING_IMPLEMENTATION_SUMMARY.md) | Comprehensive Security Fixes | ✅ Complete |
 
 ### 6. AI Service Documentation
@@ -377,4 +382,4 @@ If you find issues with documentation:
 
 **Last Updated:** 2026-02-07  
 **Documentation Version:** 1.0  
-**Project Phase:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 In Progress (6/11 tasks)
+**Project Phase:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 In Progress (9/11 tasks)
