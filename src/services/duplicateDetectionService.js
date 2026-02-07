@@ -99,11 +99,14 @@ function calculateDeterministicScore(student1, student2) {
  * @param {string} studentData.date_of_birth - Date of birth (YYYY-MM-DD)
  * @param {string} studentData.tenant_id - Tenant ID
  * @param {string} [studentData.student_id] - Optional student ID to exclude from search
+ * @param {string} [studentData.email] - Optional email
+ * @param {string} [studentData.phone] - Optional phone
+ * @param {boolean} [studentData.use_ai] - Whether to use AI semantic matching (default: true)
  * @returns {Promise<Array>} Array of candidate duplicate pairs with scores
  */
 async function checkDuplicates(studentData) {
   const pool = getPool();
-  const { first_name, last_name, date_of_birth, tenant_id, student_id } = studentData;
+  const { first_name, last_name, date_of_birth, tenant_id, student_id, email, phone, use_ai = true } = studentData;
   
   if (!first_name || !last_name || !tenant_id) {
     throw new Error('Missing required fields: first_name, last_name, tenant_id');
@@ -135,9 +138,9 @@ async function checkDuplicates(studentData) {
   const result = await pool.query(query, params);
   const existingStudents = result.rows;
   
-  // Calculate scores for all existing students
+  // Calculate deterministic scores for all existing students
   const candidates = [];
-  const threshold = 0.75;
+  const deterministicThreshold = 0.5; // Lower threshold for deterministic to allow AI to enhance
   
   for (const existing of existingStudents) {
     const scoreData = calculateDeterministicScore(
@@ -145,7 +148,8 @@ async function checkDuplicates(studentData) {
       existing
     );
     
-    if (scoreData.score >= threshold) {
+    // Only consider candidates with deterministic score > 0.5
+    if (scoreData.score >= deterministicThreshold) {
       candidates.push({
         candidate_student_id: existing.student_id,
         candidate_first_name: existing.first_name,
@@ -154,29 +158,56 @@ async function checkDuplicates(studentData) {
         candidate_email: existing.email,
         candidate_phone: existing.phone,
         candidate_created_at: existing.created_at,
-        likelihood_score: scoreData.score,
         deterministic_score: scoreData.score,
         first_name_similarity: scoreData.firstNameSimilarity,
         last_name_similarity: scoreData.lastNameSimilarity,
-        dob_match: scoreData.dobMatch,
-        reason_codes: generateReasonCodes(scoreData),
-        status: 'pending_review'
+        dob_match: scoreData.dobMatch
       });
     }
   }
   
-  // Sort by likelihood score (highest first)
-  candidates.sort((a, b) => b.likelihood_score - a.likelihood_score);
+  // If no candidates or AI disabled, return deterministic-only results
+  if (candidates.length === 0 || !use_ai) {
+    return candidates
+      .filter(c => c.deterministic_score >= 0.75)
+      .map(c => ({
+        ...c,
+        likelihood_score: c.deterministic_score,
+        ai_similarity_score: null,
+        reason_codes: generateReasonCodes({
+          score: c.deterministic_score,
+          firstNameSimilarity: c.first_name_similarity,
+          lastNameSimilarity: c.last_name_similarity,
+          dobMatch: c.dob_match
+        }),
+        explainability: {
+          method: 'deterministic_only',
+          ai_enabled: false
+        },
+        status: 'pending_review'
+      }))
+      .sort((a, b) => b.likelihood_score - a.likelihood_score);
+  }
   
-  return candidates;
+  // Task 3.2.3: Apply consolidated scoring with AI semantic matching
+  const consolidatedResults = await applyConsolidatedScoring(
+    { first_name, last_name, date_of_birth, email, phone },
+    candidates
+  );
+  
+  // Filter by final threshold (0.75) and sort
+  return consolidatedResults
+    .filter(c => c.likelihood_score >= 0.75)
+    .sort((a, b) => b.likelihood_score - a.likelihood_score);
 }
 
 /**
  * Generate human-readable reason codes for duplicate detection
  */
-function generateReasonCodes(scoreData) {
+function generateReasonCodes(scoreData, aiData = null) {
   const reasons = [];
   
+  // Deterministic reasons
   if (scoreData.firstNameSimilarity >= 0.9) {
     reasons.push(`High first name similarity (${(scoreData.firstNameSimilarity * 100).toFixed(0)}%)`);
   } else if (scoreData.firstNameSimilarity >= 0.7) {
@@ -193,6 +224,15 @@ function generateReasonCodes(scoreData) {
     reasons.push('Date of birth exact match');
   }
   
+  // AI semantic reasons
+  if (aiData && aiData.semantic_similarity) {
+    if (aiData.semantic_similarity >= 0.9) {
+      reasons.push(`High semantic match detected (Cosine: ${(aiData.semantic_similarity * 100).toFixed(0)}%)`);
+    } else if (aiData.semantic_similarity >= 0.85) {
+      reasons.push(`Semantic match detected (Cosine: ${(aiData.semantic_similarity * 100).toFixed(0)}%)`);
+    }
+  }
+  
   if (reasons.length === 0) {
     reasons.push('Potential match detected');
   }
@@ -201,19 +241,208 @@ function generateReasonCodes(scoreData) {
 }
 
 /**
+ * Task 3.2.3: Apply consolidated scoring combining deterministic + AI semantic matching
+ * Formula: likelihood_score = 0.6 × deterministic_score + 0.4 × ai_similarity_score
+ * 
+ * @param {Object} queryStudent - Student data to check
+ * @param {Array} candidates - Array of candidate matches with deterministic scores
+ * @returns {Promise<Array>} Candidates with consolidated scores
+ */
+async function applyConsolidatedScoring(queryStudent, candidates) {
+  if (candidates.length === 0) {
+    return [];
+  }
+  
+  try {
+    // Check if AI service is available
+    const aiServiceUrl = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+    
+    // Prepare request for AI service
+    const candidateStudents = candidates.map(c => ({
+      student_id: c.candidate_student_id,
+      first_name: c.candidate_first_name,
+      last_name: c.candidate_last_name,
+      date_of_birth: c.candidate_date_of_birth,
+      email: c.candidate_email,
+      phone: c.candidate_phone
+    }));
+    
+    const requestBody = {
+      query_student: {
+        first_name: queryStudent.first_name,
+        last_name: queryStudent.last_name,
+        date_of_birth: queryStudent.date_of_birth,
+        email: queryStudent.email,
+        phone: queryStudent.phone
+      },
+      candidate_students: candidateStudents,
+      threshold: 0.85 // AI threshold for semantic duplicates
+    };
+    
+    // Call AI service for semantic matching using http module
+    const http = require('http');
+    const url = require('url');
+    
+    const aiUrl = new url.URL(`${aiServiceUrl}/api/v1/semantic/find-duplicates`);
+    const postData = JSON.stringify(requestBody);
+    
+    const options = {
+      hostname: aiUrl.hostname,
+      port: aiUrl.port || 8000,
+      path: aiUrl.pathname,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      },
+      timeout: 5000 // 5 second timeout
+    };
+    
+    const aiResponse = await new Promise((resolve, reject) => {
+      const req = http.request(options, (res) => {
+        let data = '';
+        
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            try {
+              resolve(JSON.parse(data));
+            } catch (e) {
+              reject(new Error(`Invalid JSON response: ${e.message}`));
+            }
+          } else {
+            reject(new Error(`AI service returned status ${res.statusCode}`));
+          }
+        });
+      });
+      
+      req.on('error', (error) => {
+        reject(error);
+      });
+      
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('AI service request timeout'));
+      });
+      
+      req.write(postData);
+      req.end();
+    });
+    
+    // Create a map of AI scores by student_id
+    const aiScoreMap = new Map();
+    for (const match of aiResponse.matches || []) {
+      aiScoreMap.set(
+        match.candidate_student.student_id,
+        {
+          semantic_similarity: match.semantic_similarity,
+          is_semantic_duplicate: match.is_semantic_duplicate,
+          model_version: match.model_version,
+          embedding_dimension: match.embedding_dimension
+        }
+      );
+    }
+    
+    // Apply consolidated scoring formula: 0.6 × deterministic + 0.4 × AI
+    const consolidatedResults = candidates.map(candidate => {
+      const aiScore = aiScoreMap.get(candidate.candidate_student_id);
+      
+      let likelihood_score;
+      let ai_similarity_score = null;
+      let explainability;
+      
+      if (aiScore) {
+        // Consolidated score with AI
+        likelihood_score = (0.6 * candidate.deterministic_score) + (0.4 * aiScore.semantic_similarity);
+        ai_similarity_score = aiScore.semantic_similarity;
+        
+        explainability = {
+          method: 'consolidated',
+          formula: '0.6 × deterministic + 0.4 × AI_similarity',
+          deterministic_score: candidate.deterministic_score,
+          deterministic_weight: 0.6,
+          ai_similarity_score: aiScore.semantic_similarity,
+          ai_weight: 0.4,
+          ai_model: aiScore.model_version,
+          embedding_dimension: aiScore.embedding_dimension,
+          is_semantic_duplicate: aiScore.is_semantic_duplicate
+        };
+      } else {
+        // No AI score available for this candidate (below AI threshold)
+        likelihood_score = candidate.deterministic_score;
+        
+        explainability = {
+          method: 'deterministic_only',
+          reason: 'Below AI semantic threshold (0.85)',
+          deterministic_weight: 1.0,
+          ai_weight: 0.0
+        };
+      }
+      
+      return {
+        ...candidate,
+        likelihood_score,
+        ai_similarity_score,
+        reason_codes: generateReasonCodes(
+          {
+            score: candidate.deterministic_score,
+            firstNameSimilarity: candidate.first_name_similarity,
+            lastNameSimilarity: candidate.last_name_similarity,
+            dobMatch: candidate.dob_match
+          },
+          aiScore
+        ),
+        explainability,
+        status: 'pending_review'
+      };
+    });
+    
+    return consolidatedResults;
+    
+  } catch (error) {
+    // AI service error - fall back to deterministic only
+    console.error('Error calling AI service:', error.message);
+    
+    return candidates.map(c => ({
+      ...c,
+      likelihood_score: c.deterministic_score,
+      ai_similarity_score: null,
+      reason_codes: generateReasonCodes({
+        score: c.deterministic_score,
+        firstNameSimilarity: c.first_name_similarity,
+        lastNameSimilarity: c.last_name_similarity,
+        dobMatch: c.dob_match
+      }),
+      explainability: {
+        method: 'deterministic_only',
+        reason: `AI service error: ${error.message}`,
+        deterministic_weight: 1.0,
+        ai_weight: 0.0
+      },
+      status: 'pending_review'
+    }));
+  }
+}
+
+/**
  * Batch check duplicates for multiple students (for bulk imports)
  * 
  * @param {Array} students - Array of student data objects
  * @param {string} tenantId - Tenant ID
+ * @param {boolean} [useAi] - Whether to use AI semantic matching
  * @returns {Promise<Array>} Array of results with duplicates for each student
  */
-async function batchCheckDuplicates(students, tenantId) {
+async function batchCheckDuplicates(students, tenantId, useAi = true) {
   const results = [];
   
   for (const student of students) {
     const duplicates = await checkDuplicates({
       ...student,
-      tenant_id: tenantId
+      tenant_id: tenantId,
+      use_ai: useAi
     });
     
     results.push({
@@ -231,5 +460,6 @@ module.exports = {
   calculateDeterministicScore,
   checkDuplicates,
   batchCheckDuplicates,
-  generateReasonCodes
+  generateReasonCodes,
+  applyConsolidatedScoring
 };

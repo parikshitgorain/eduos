@@ -249,7 +249,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - API: POST `/api/v1/students/check-duplicates` returns candidate pairs
     - Performance: < 500ms for 100K student database
 
-- [ ] 3.2.2 Integrate Sentence-BERT for semantic matching
+- [x] 3.2.2 Integrate Sentence-BERT for semantic matching
   - **Definition of Done:**
     - SBERT model loaded in AI service (e.g., `all-MiniLM-L6-v2`)
     - Generate 768-dimensional embeddings for student profiles
@@ -258,7 +258,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - Batch processing: 1000 embeddings per minute
 
 
-- [ ] 3.2.3 Create consolidated duplicate scoring system
+- [x] 3.2.3 Create consolidated duplicate scoring system
   - **Definition of Done:**
     - Combined score: 0.6×deterministic + 0.4×AI_similarity
     - Output includes: likelihood_score, reason_codes, explainability

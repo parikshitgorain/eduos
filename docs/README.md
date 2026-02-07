@@ -154,6 +154,9 @@ eduos-platform/
 | [Task 2.2.4](tasks/TASK_2.2.4_IMPLEMENTATION_SUMMARY.md) | Schema Migration Engine with Dry-Run Mode | ✅ Complete |
 | [Task 3.1.1](tasks/TASK_3.1.1_IMPLEMENTATION_SUMMARY.md) | Python FastAPI AI Service | ✅ Complete |
 | [Task 3.1.2](tasks/TASK_3.1.2_IMPLEMENTATION_SUMMARY.md) | AI Governance Framework | ✅ Complete |
+| [Task 3.2.1](tasks/TASK_3.2.1_IMPLEMENTATION_SUMMARY.md) | Deterministic Fuzzy Matching | ✅ Complete |
+| [Task 3.2.2](tasks/TASK_3.2.2_IMPLEMENTATION_SUMMARY.md) | Sentence-BERT Semantic Matching | ✅ Complete |
+| [Task 3.2.3](tasks/TASK_3.2.3_IMPLEMENTATION_SUMMARY.md) | Consolidated Duplicate Scoring System | ✅ Complete |
 | [Security Hardening](tasks/SECURITY_HARDENING_IMPLEMENTATION_SUMMARY.md) | Comprehensive Security Fixes | ✅ Complete |
 
 ### 6. AI Service Documentation
@@ -311,6 +314,8 @@ All documentation should include:
 - ✅ Task 2.2.5 Summary (Historic Rendering with Snapshot Association)
 - ✅ Task 3.1.1 Summary (Python FastAPI AI Service)
 - ✅ Task 3.1.2 Summary (AI Governance Framework)
+- ✅ Task 3.2.1 Summary (Deterministic Fuzzy Matching)
+- ✅ Task 3.2.2 Summary (Sentence-BERT Semantic Matching)
 - ✅ Security Hardening Implementation Summary
 - ✅ Security Guide
 - ✅ Security Fixes Report
@@ -371,4 +376,4 @@ If you find issues with documentation:
 
 **Last Updated:** 2026-02-07  
 **Documentation Version:** 1.0  
-**Project Phase:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 In Progress (2/11 tasks)
+**Project Phase:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 In Progress (5/11 tasks)

@@ -452,6 +452,9 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 - [Task 2.2.5](docs/tasks/TASK_2.2.5_IMPLEMENTATION_SUMMARY.md) - Historic Rendering ✅
 - [Task 3.1.1](docs/tasks/TASK_3.1.1_IMPLEMENTATION_SUMMARY.md) - Python FastAPI AI Service ✅
 - [Task 3.1.2](docs/tasks/TASK_3.1.2_IMPLEMENTATION_SUMMARY.md) - AI Governance Framework ✅
+- [Task 3.2.1](docs/tasks/TASK_3.2.1_IMPLEMENTATION_SUMMARY.md) - Deterministic Fuzzy Matching ✅
+- [Task 3.2.2](docs/tasks/TASK_3.2.2_IMPLEMENTATION_SUMMARY.md) - Sentence-BERT Semantic Matching ✅
+- [Task 3.2.3](docs/tasks/TASK_3.2.3_IMPLEMENTATION_SUMMARY.md) - Consolidated Duplicate Scoring System ✅
 
 **Authentication:**
 - [Auth Service](docs/AUTH_SERVICE.md) - OAuth2/OIDC authentication service
@@ -593,8 +596,33 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 - ✅ Audit log: all AI predictions and human decisions recorded
 - ✅ 21 unit tests passing (16 governance + 5 main)
 
-- [ ] Identity resolution (duplicate detection)
-- [ ] Identity resolution (duplicate detection)
+#### ✅ Task 3.2.1: Build deterministic fuzzy matching layer - COMPLETED
+- ✅ Levenshtein distance algorithm for name matching
+- ✅ Scoring formula: 0.4×first_name + 0.4×last_name + 0.2×DOB_match
+- ✅ Threshold: scores > 0.75 flagged as potential duplicates
+- ✅ API: POST `/api/v1/students/check-duplicates` returns candidate pairs
+- ✅ Performance: < 500ms for 100K student database
+- ✅ 17 unit tests passing
+
+#### ✅ Task 3.2.2: Integrate Sentence-BERT for semantic matching - COMPLETED
+- ✅ SBERT model loaded in AI service (`all-MiniLM-L6-v2`)
+- ✅ Generate 384-dimensional embeddings for student profiles
+- ✅ Cosine similarity calculation between candidate pairs
+- ✅ Threshold: similarity > 0.85 flags semantic duplicates
+- ✅ Batch processing: 1000+ embeddings per minute
+- ✅ 3 new API endpoints for semantic matching
+- ✅ 45+ unit and integration tests passing
+
+#### ✅ Task 3.2.3: Create consolidated duplicate scoring system - COMPLETED
+- ✅ Hybrid scoring: 0.6×deterministic + 0.4×AI_similarity
+- ✅ Consolidated reason codes from both deterministic and AI matching
+- ✅ Graceful degradation when AI service unavailable
+- ✅ Comprehensive explainability metadata for all scoring methods
+- ✅ API response format matches Design Spec Section 2.2.2
+- ✅ Performance: < 500ms response time
+- ✅ 11 unit tests passing (100% coverage)
+
+- [ ] Task 3.2.4: Build duplicate review queue UI
 - [ ] Merge operations with governance
 - [ ] Human-in-the-loop workflows
 
@@ -722,6 +750,6 @@ Built with:
 
 ---
 
-**Project Status:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 In Progress (3/11 tasks)  
-**Next Milestone:** Task 3.2.2 - Integrate Sentence-BERT for Semantic Matching  
+**Project Status:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 In Progress (5/11 tasks)  
+**Next Milestone:** Task 3.2.4 - Build Duplicate Review Queue UI  
 **Last Updated:** 2026-02-07

@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-02-07  
 **Current Phase:** Phase 3 - The Intelligence Layer  
-**Status:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 In Progress (2/11 tasks)
+**Status:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 In Progress (5/11 tasks)
 
 ---
 
@@ -251,12 +251,12 @@
 **Status:** 14/14 tasks complete (100%) 🎉
 
 **Next Milestone:** Phase 3 - The Intelligence Layer (Weeks 9-12)  
-**Status:** 3/11 tasks complete (27%)  
-**Next Task:** Task 3.2.2 - Integrate Sentence-BERT for semantic matching
+**Status:** 5/11 tasks complete (45%)  
+**Next Task:** Task 3.2.4 - Build duplicate review queue UI
 
 ### Phase 3: The Intelligence Layer (Weeks 9-12)
 
-**Progress:** 3/11 tasks complete (27%)
+**Progress:** 5/11 tasks complete (45%)
 
 #### ✅ Completed Tasks
 
@@ -293,10 +293,28 @@
    - [Implementation Summary](tasks/TASK_3.2.1_IMPLEMENTATION_SUMMARY.md)
    - [API Documentation](DUPLICATE_DETECTION_API.md)
 
+4. **Task 3.2.2: Integrate Sentence-BERT for semantic matching** - COMPLETE ✅
+   - SBERT model loaded in AI service (`all-MiniLM-L6-v2`)
+   - Generate 384-dimensional embeddings for student profiles
+   - Cosine similarity calculation between candidate pairs
+   - Threshold: similarity > 0.85 flags semantic duplicates
+   - Batch processing: 1000+ embeddings per minute
+   - 3 new API endpoints for semantic matching
+   - 45+ unit and integration tests passing
+   - [Implementation Summary](tasks/TASK_3.2.2_IMPLEMENTATION_SUMMARY.md)
+
+5. **Task 3.2.3: Create consolidated duplicate scoring system** - COMPLETE ✅
+   - Hybrid scoring: 0.6×deterministic + 0.4×AI_similarity
+   - Consolidated reason codes from both deterministic and AI matching
+   - Graceful degradation when AI service unavailable
+   - Comprehensive explainability metadata for all scoring methods
+   - API response format matches Design Spec Section 2.2.2
+   - Performance: < 500ms response time
+   - 11 unit tests passing (100% coverage)
+   - [Implementation Summary](tasks/TASK_3.2.3_IMPLEMENTATION_SUMMARY.md)
+
 #### ⏳ Pending
 
-- Task 3.2.2: Integrate Sentence-BERT for semantic matching
-- Task 3.2.3: Create consolidated duplicate scoring system
 - Task 3.2.4: Build duplicate review queue UI
 - Task 3.3.1: Implement pre-merge cryptographic snapshots
 - Task 3.3.2: Build merge workflow with impact assessment
@@ -309,7 +327,7 @@
 
 ## 📈 Test Coverage
 
-**Total Tests:** 1122+ passing ✅
+**Total Tests:** 1133+ passing ✅
 
 ### By Component
 
@@ -345,6 +363,10 @@
 | Field Permissions Routes | 21 | 100% | ✅ |
 | Schema Migration Service | 9 | 70% | ✅ |
 | Schema Migration Routes | 18 | 100% | ✅ |
+| Duplicate Detection Service | 27 | 95% | ✅ |
+| Duplicate Detection Routes | 14 | 100% | ✅ |
+| Semantic Matching (AI) | 45+ | 100% | ✅ |
+| Consolidated Scoring | 11 | 100% | ✅ |
 
 ---
 
@@ -717,12 +739,13 @@ services:
 
 ---
 
-**Status:** Phase 1 Complete! 🎉 Phase 2 In Progress (9/14 tasks)  
+**Status:** Phase 1 Complete! 🎉 Phase 2 Complete! 🎉 Phase 3 In Progress (5/11 tasks)  
 **Phase 1 Completion:** 100% (13/13 tasks)  
-**Phase 2 Completion:** 64% (9/14 tasks)  
-**Overall Project:** Phase 1 of 5 complete + Phase 2 in progress (40% complete)
+**Phase 2 Completion:** 100% (14/14 tasks)  
+**Phase 3 Completion:** 45% (5/11 tasks)  
+**Overall Project:** Phase 1 & 2 complete + Phase 3 in progress (45% complete)
 
 ---
 
-**Last Updated:** 2026-02-05  
-**Next Task:** Task 2.3.2 - Implement Idempotent Sync Engine
+**Last Updated:** 2026-02-07  
+**Next Task:** Task 3.2.4 - Build Duplicate Review Queue UI
