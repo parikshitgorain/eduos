@@ -539,4 +539,538 @@ describe('Authentication Routes', () => {
       expect(response.body.error).toBe('Unauthorized');
     });
   });
+
+  // ============================================================================
+  // ADDITIONAL TESTS FOR 90%+ COVERAGE
+  // ============================================================================
+
+  describe('GET /auth/:provider/login - Additional Coverage', () => {
+    test('should reject invalid provider', async () => {
+      const response = await request(app)
+        .get('/auth/invalid-provider/login')
+        .query({ tenant_id: testTenantId })
+        .expect(400);
+
+      expect(response.body.message).toBe('Invalid provider. Supported providers: google, microsoft');
+    });
+
+    test('should reject request for non-existent tenant', async () => {
+      const response = await request(app)
+        .get('/auth/google/login')
+        .query({ tenant_id: '00000000-0000-0000-0000-000000000000' })
+        .expect(404);
+
+      expect(response.body.message).toBe('Tenant not found');
+    });
+
+    test('should reject request for inactive tenant', async () => {
+      // Create inactive tenant
+      const inactiveTenantResult = await query(
+        `INSERT INTO tenants (name, subdomain, tier, status)
+         VALUES ($1, $2, $3, $4)
+         RETURNING tenant_id`,
+        ['Inactive Tenant', 'inactive-test', 'Basic', 'suspended']
+      );
+      const inactiveTenantId = inactiveTenantResult.rows[0].tenant_id;
+
+      const response = await request(app)
+        .get('/auth/google/login')
+        .query({ tenant_id: inactiveTenantId })
+        .expect(403);
+
+      expect(response.body.message).toBe('Tenant is not active');
+
+      // Cleanup
+      await query('DELETE FROM tenants WHERE tenant_id = $1', [inactiveTenantId]);
+    });
+
+    test('should handle database errors during tenant lookup', async () => {
+      // Mock database query to throw error
+      const originalQuery = require('../config/database').query;
+      jest.spyOn(require('../config/database'), 'query').mockRejectedValueOnce(
+        new Error('Database connection failed')
+      );
+
+      const response = await request(app)
+        .get('/auth/google/login')
+        .query({ tenant_id: testTenantId })
+        .expect(500);
+
+      expect(response.body.error).toBe('Internal Server Error');
+
+      // Restore original
+      require('../config/database').query.mockRestore();
+    });
+
+    test('should generate authorization URL for google', async () => {
+      // Mock authService.getAuthorizationUrl
+      jest.spyOn(authService, 'getAuthorizationUrl').mockReturnValueOnce({
+        url: 'https://accounts.google.com/o/oauth2/v2/auth?client_id=test',
+        state: 'test-state-123'
+      });
+
+      const response = await request(app)
+        .get('/auth/google/login')
+        .query({ tenant_id: testTenantId })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('authorization_url');
+      expect(response.body).toHaveProperty('state');
+      expect(response.body.provider).toBe('google');
+
+      authService.getAuthorizationUrl.mockRestore();
+    });
+
+    test('should generate authorization URL for microsoft', async () => {
+      // Mock authService.getAuthorizationUrl
+      jest.spyOn(authService, 'getAuthorizationUrl').mockReturnValueOnce({
+        url: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=test',
+        state: 'test-state-456'
+      });
+
+      const response = await request(app)
+        .get('/auth/microsoft/login')
+        .query({ tenant_id: testTenantId })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('authorization_url');
+      expect(response.body).toHaveProperty('state');
+      expect(response.body.provider).toBe('microsoft');
+
+      authService.getAuthorizationUrl.mockRestore();
+    });
+  });
+
+  describe('GET /auth/:provider/callback - OAuth Callback Coverage', () => {
+    test('should handle OAuth error in callback', async () => {
+      const response = await request(app)
+        .get('/auth/google/callback')
+        .query({
+          error: 'access_denied',
+          error_description: 'User denied access'
+        })
+        .expect(400);
+
+      expect(response.body.error).toBe('OAuth2 Error');
+      expect(response.body.message).toBe('User denied access');
+    });
+
+    test('should handle OAuth error without description', async () => {
+      const response = await request(app)
+        .get('/auth/google/callback')
+        .query({
+          error: 'server_error'
+        })
+        .expect(400);
+
+      expect(response.body.error).toBe('OAuth2 Error');
+      expect(response.body.message).toBe('server_error');
+    });
+
+    test('should reject callback without code', async () => {
+      const response = await request(app)
+        .get('/auth/google/callback')
+        .query({
+          state: 'test-state'
+        })
+        .expect(400);
+
+      expect(response.body.message).toBe('Missing code or state parameter');
+    });
+
+    test('should reject callback without state', async () => {
+      const response = await request(app)
+        .get('/auth/google/callback')
+        .query({
+          code: 'test-code'
+        })
+        .expect(400);
+
+      expect(response.body.message).toBe('Missing code or state parameter');
+    });
+
+    test('should create new user on first login', async () => {
+      // Mock authService.handleCallback to return new user info
+      jest.spyOn(authService, 'handleCallback').mockResolvedValueOnce({
+        email: 'newuser@example.com',
+        tenantId: testTenantId,
+        name: 'New User',
+        givenName: 'New',
+        familyName: 'User',
+        providerId: 'google-123456'
+      });
+
+      const response = await request(app)
+        .get('/auth/google/callback')
+        .query({
+          code: 'test-code',
+          state: 'test-state'
+        })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('access_token');
+      expect(response.body).toHaveProperty('refresh_token');
+      expect(response.body.user.email).toBe('newuser@example.com');
+      expect(response.body.user.roles).toContain('user');
+
+      // Cleanup
+      await query('DELETE FROM users WHERE email = $1 AND tenant_id = $2', 
+        ['newuser@example.com', testTenantId]);
+
+      authService.handleCallback.mockRestore();
+    });
+
+    test('should reject login for inactive user', async () => {
+      // Create inactive user
+      const inactiveUserResult = await query(
+        `INSERT INTO users (tenant_id, email, first_name, last_name, auth_provider, status, roles)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING user_id`,
+        [testTenantId, 'inactive@example.com', 'Inactive', 'User', 'google', 'suspended', ['user']]
+      );
+
+      // Mock authService.handleCallback
+      jest.spyOn(authService, 'handleCallback').mockResolvedValueOnce({
+        email: 'inactive@example.com',
+        tenantId: testTenantId,
+        name: 'Inactive User',
+        givenName: 'Inactive',
+        familyName: 'User',
+        providerId: 'google-inactive'
+      });
+
+      const response = await request(app)
+        .get('/auth/google/callback')
+        .query({
+          code: 'test-code',
+          state: 'test-state'
+        })
+        .expect(403);
+
+      expect(response.body.message).toBe('User account is not active');
+
+      // Cleanup
+      await query('DELETE FROM users WHERE user_id = $1', [inactiveUserResult.rows[0].user_id]);
+      authService.handleCallback.mockRestore();
+    });
+
+    test('should update last login for existing user', async () => {
+      // Mock authService.handleCallback
+      jest.spyOn(authService, 'handleCallback').mockResolvedValueOnce({
+        email: 'test@example.com',
+        tenantId: testTenantId,
+        name: 'Test User',
+        givenName: 'Test',
+        familyName: 'User',
+        providerId: 'google-test'
+      });
+
+      const response = await request(app)
+        .get('/auth/google/callback')
+        .query({
+          code: 'test-code',
+          state: 'test-state'
+        })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('access_token');
+      expect(response.body.user.email).toBe('test@example.com');
+
+      // Verify last_login_at was updated
+      const userCheck = await query(
+        'SELECT last_login_at FROM users WHERE user_id = $1',
+        [testUserId]
+      );
+      expect(userCheck.rows[0].last_login_at).not.toBeNull();
+
+      authService.handleCallback.mockRestore();
+    });
+
+    test('should handle callback errors gracefully', async () => {
+      // Mock authService.handleCallback to throw error
+      jest.spyOn(authService, 'handleCallback').mockRejectedValueOnce(
+        new Error('Invalid authorization code')
+      );
+
+      const response = await request(app)
+        .get('/auth/google/callback')
+        .query({
+          code: 'invalid-code',
+          state: 'test-state'
+        })
+        .expect(500);
+
+      expect(response.body.error).toBe('Internal Server Error');
+
+      authService.handleCallback.mockRestore();
+    });
+  });
+
+  describe('POST /auth/token/refresh - Additional Coverage', () => {
+    test('should reject refresh without token', async () => {
+      const response = await request(app)
+        .post('/auth/token/refresh')
+        .send({})
+        .expect(400);
+
+      expect(response.body.message).toBe('refresh_token is required');
+    });
+
+    test('should handle invalid refresh token', async () => {
+      const response = await request(app)
+        .post('/auth/token/refresh')
+        .send({ refresh_token: 'invalid-token' })
+        .expect(401);
+
+      expect(response.body.error).toBe('Unauthorized');
+    });
+
+    test('should handle expired refresh token', async () => {
+      // Mock authService.refreshAccessToken to throw error for expired token
+      jest.spyOn(authService, 'refreshAccessToken').mockRejectedValueOnce(
+        new Error('Refresh token expired')
+      );
+
+      const response = await request(app)
+        .post('/auth/token/refresh')
+        .send({ refresh_token: 'expired-token' })
+        .expect(401);
+
+      expect(response.body.error).toBe('Unauthorized');
+
+      authService.refreshAccessToken.mockRestore();
+    });
+  });
+
+  describe('POST /auth/token/verify - Additional Coverage', () => {
+    test('should reject verification without token', async () => {
+      const response = await request(app)
+        .post('/auth/token/verify')
+        .send({})
+        .expect(400);
+
+      expect(response.body.message).toBe('token is required');
+    });
+
+    test('should reject invalid token format', async () => {
+      const response = await request(app)
+        .post('/auth/token/verify')
+        .send({ token: 'not-a-valid-jwt' })
+        .expect(401);
+
+      expect(response.body.valid).toBe(false);
+    });
+
+    test('should reject expired token', async () => {
+      // Mock authService.verifyToken to throw error for expired token
+      jest.spyOn(authService, 'verifyToken').mockImplementationOnce(() => {
+        throw new Error('Token expired');
+      });
+
+      const response = await request(app)
+        .post('/auth/token/verify')
+        .send({ token: 'expired-token' })
+        .expect(401);
+
+      expect(response.body.valid).toBe(false);
+
+      authService.verifyToken.mockRestore();
+    });
+
+    test('should verify valid token successfully', async () => {
+      const response = await request(app)
+        .post('/auth/token/verify')
+        .send({ token: testAccessToken })
+        .expect(200);
+
+      expect(response.body.valid).toBe(true);
+      expect(response.body.payload).toHaveProperty('sub');
+      expect(response.body.payload).toHaveProperty('tenant_id');
+    });
+  });
+
+  describe('GET /auth/userinfo - Additional Coverage', () => {
+    test('should reject request without authorization header', async () => {
+      const response = await request(app)
+        .get('/auth/userinfo')
+        .expect(401);
+
+      expect(response.body.message).toBe('Missing or invalid Authorization header');
+    });
+
+    test('should reject request with invalid authorization header format', async () => {
+      const response = await request(app)
+        .get('/auth/userinfo')
+        .set('Authorization', 'InvalidFormat token')
+        .expect(401);
+
+      expect(response.body.message).toBe('Missing or invalid Authorization header');
+    });
+
+    test('should reject request with invalid token', async () => {
+      const response = await request(app)
+        .get('/auth/userinfo')
+        .set('Authorization', 'Bearer invalid-token')
+        .expect(401);
+
+      expect(response.body.error).toBe('Unauthorized');
+    });
+
+    test('should return 404 for non-existent user', async () => {
+      // Generate token for non-existent user
+      const fakeToken = authService.generateAccessToken({
+        userId: '00000000-0000-0000-0000-000000000000',
+        tenantId: testTenantId,
+        email: 'fake@example.com',
+        roles: ['user'],
+        permissions: [],
+      });
+
+      const response = await request(app)
+        .get('/auth/userinfo')
+        .set('Authorization', `Bearer ${fakeToken}`)
+        .expect(404);
+
+      expect(response.body.message).toBe('User not found');
+    });
+
+    test('should return user info with valid token', async () => {
+      const response = await request(app)
+        .get('/auth/userinfo')
+        .set('Authorization', `Bearer ${testAccessToken}`)
+        .expect(200);
+
+      expect(response.body.sub).toBe(testUserId);
+      expect(response.body.email).toBe('test@example.com');
+      expect(response.body.tenant_id).toBe(testTenantId);
+      expect(response.body).toHaveProperty('name');
+      expect(response.body).toHaveProperty('roles');
+    });
+  });
+
+  describe('POST /auth/logout - Additional Coverage', () => {
+    test('should logout without token (anonymous logout)', async () => {
+      const response = await request(app)
+        .post('/auth/logout')
+        .expect(200);
+
+      expect(response.body.message).toBe('Logged out successfully');
+    });
+
+    test('should logout with invalid token gracefully', async () => {
+      const response = await request(app)
+        .post('/auth/logout')
+        .set('Authorization', 'Bearer invalid-token')
+        .expect(200);
+
+      expect(response.body.message).toBe('Logged out successfully');
+    });
+
+    test('should logout and log audit event with valid token', async () => {
+      const response = await request(app)
+        .post('/auth/logout')
+        .set('Authorization', `Bearer ${testAccessToken}`)
+        .expect(200);
+
+      expect(response.body.message).toBe('Logged out successfully');
+
+      // Verify audit log was created
+      const auditLog = await query(
+        `SELECT * FROM audit_logs 
+         WHERE user_id = $1 AND action = 'user_logout' 
+         ORDER BY created_at DESC LIMIT 1`,
+        [testUserId]
+      );
+      expect(auditLog.rowCount).toBeGreaterThan(0);
+    });
+  });
+
+  describe('GET /auth/permissions - Additional Coverage', () => {
+    test('should reject request without authorization header', async () => {
+      const response = await request(app)
+        .get('/auth/permissions')
+        .expect(401);
+
+      expect(response.body.message).toBe('Missing or invalid Authorization header');
+    });
+
+    test('should reject request with invalid token', async () => {
+      const response = await request(app)
+        .get('/auth/permissions')
+        .set('Authorization', 'Bearer invalid-token')
+        .expect(401);
+
+      expect(response.body.error).toBe('Unauthorized');
+    });
+
+    test('should handle rbacService errors gracefully', async () => {
+      // Mock rbacService to throw error
+      jest.spyOn(rbacService, 'getUserPermissions').mockRejectedValueOnce(
+        new Error('RBAC service unavailable')
+      );
+
+      const response = await request(app)
+        .get('/auth/permissions')
+        .set('Authorization', `Bearer ${testAccessToken}`)
+        .expect(401);
+
+      expect(response.body.error).toBe('Unauthorized');
+
+      rbacService.getUserPermissions.mockRestore();
+    });
+  });
+
+  describe('GET /auth/permissions/fields/:resourceType - Additional Coverage', () => {
+    test('should reject request without authorization header', async () => {
+      const response = await request(app)
+        .get('/auth/permissions/fields/student')
+        .expect(401);
+
+      expect(response.body.message).toBe('Missing or invalid Authorization header');
+    });
+
+    test('should reject request with invalid token', async () => {
+      const response = await request(app)
+        .get('/auth/permissions/fields/student')
+        .set('Authorization', 'Bearer invalid-token')
+        .expect(401);
+
+      expect(response.body.error).toBe('Unauthorized');
+    });
+
+    test('should handle rbacService errors gracefully', async () => {
+      // Mock rbacService to throw error
+      jest.spyOn(rbacService, 'getUserFieldPermissions').mockRejectedValueOnce(
+        new Error('Field permissions unavailable')
+      );
+
+      const response = await request(app)
+        .get('/auth/permissions/fields/student')
+        .set('Authorization', `Bearer ${testAccessToken}`)
+        .expect(401);
+
+      expect(response.body.error).toBe('Unauthorized');
+
+      rbacService.getUserFieldPermissions.mockRestore();
+    });
+
+    test('should return field permissions for valid request', async () => {
+      // Mock rbacService
+      jest.spyOn(rbacService, 'getUserFieldPermissions').mockResolvedValueOnce({
+        name: { read: true, write: false },
+        email: { read: true, write: false },
+        grade: { read: true, write: true }
+      });
+
+      const response = await request(app)
+        .get('/auth/permissions/fields/student')
+        .set('Authorization', `Bearer ${testAccessToken}`)
+        .expect(200);
+
+      expect(response.body.resource_type).toBe('student');
+      expect(response.body).toHaveProperty('field_permissions');
+
+      rbacService.getUserFieldPermissions.mockRestore();
+    });
+  });
 });
