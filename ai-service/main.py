@@ -6,7 +6,7 @@ Isolated from System of Record - Advisory mode only
 
 from fastapi import FastAPI, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 import logging
@@ -26,6 +26,9 @@ from governance import governance_manager
 
 # Import semantic matching
 from semantic_matching import get_semantic_matcher
+
+# Import explainability dashboard
+from explainability import get_explainability_dashboard
 
 # Configure logging
 logging.basicConfig(
@@ -319,51 +322,49 @@ async def get_audit_logs(
 
 class StudentProfile(BaseModel):
     """Student profile for semantic matching"""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "student_id": "student_123",
+            "first_name": "John",
+            "last_name": "Doe",
+            "date_of_birth": "2005-03-15",
+            "email": "john.doe@example.com",
+            "phone": "+1234567890"
+        }
+    })
+    
     student_id: Optional[str] = None
     first_name: str
     last_name: str
     date_of_birth: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "student_id": "student_123",
-                "first_name": "John",
-                "last_name": "Doe",
-                "date_of_birth": "2005-03-15",
-                "email": "john.doe@example.com",
-                "phone": "+1234567890"
-            }
-        }
 
 
 class SemanticMatchRequest(BaseModel):
     """Request for semantic duplicate detection"""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "query_student": {
+                "first_name": "John",
+                "last_name": "Doe",
+                "date_of_birth": "2005-03-15"
+            },
+            "candidate_students": [
+                {
+                    "student_id": "student_456",
+                    "first_name": "Jon",
+                    "last_name": "Doe",
+                    "date_of_birth": "2005-03-15"
+                }
+            ],
+            "threshold": 0.85
+        }
+    })
+    
     query_student: StudentProfile
     candidate_students: List[StudentProfile]
     threshold: Optional[float] = Field(0.85, ge=0.0, le=1.0, description="Similarity threshold")
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "query_student": {
-                    "first_name": "John",
-                    "last_name": "Doe",
-                    "date_of_birth": "2005-03-15"
-                },
-                "candidate_students": [
-                    {
-                        "student_id": "student_456",
-                        "first_name": "Jon",
-                        "last_name": "Doe",
-                        "date_of_birth": "2005-03-15"
-                    }
-                ],
-                "threshold": 0.85
-            }
-        }
 
 
 class SemanticMatchResult(BaseModel):
@@ -378,60 +379,58 @@ class SemanticMatchResult(BaseModel):
 
 class SemanticMatchResponse(BaseModel):
     """Response for semantic duplicate detection"""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "matches": [
+                {
+                    "candidate_student": {
+                        "student_id": "student_456",
+                        "first_name": "Jon",
+                        "last_name": "Doe",
+                        "date_of_birth": "2005-03-15"
+                    },
+                    "semantic_similarity": 0.92,
+                    "is_semantic_duplicate": True,
+                    "threshold_used": 0.85,
+                    "embedding_dimension": 384,
+                    "model_version": "all-MiniLM-L6-v2"
+                }
+            ],
+            "total_matches": 1,
+            "query_student": {
+                "first_name": "John",
+                "last_name": "Doe",
+                "date_of_birth": "2005-03-15"
+            },
+            "processing_time_ms": 45.2
+        }
+    })
+    
     matches: List[SemanticMatchResult]
     total_matches: int
     query_student: StudentProfile
     processing_time_ms: float
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "matches": [
-                    {
-                        "candidate_student": {
-                            "student_id": "student_456",
-                            "first_name": "Jon",
-                            "last_name": "Doe",
-                            "date_of_birth": "2005-03-15"
-                        },
-                        "semantic_similarity": 0.92,
-                        "is_semantic_duplicate": True,
-                        "threshold_used": 0.85,
-                        "embedding_dimension": 384,
-                        "model_version": "all-MiniLM-L6-v2"
-                    }
-                ],
-                "total_matches": 1,
-                "query_student": {
-                    "first_name": "John",
-                    "last_name": "Doe",
-                    "date_of_birth": "2005-03-15"
-                },
-                "processing_time_ms": 45.2
-            }
-        }
 
 
 class PairwiseSimilarityRequest(BaseModel):
     """Request for pairwise similarity calculation"""
-    student1: StudentProfile
-    student2: StudentProfile
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "student1": {
-                    "first_name": "John",
-                    "last_name": "Doe",
-                    "date_of_birth": "2005-03-15"
-                },
-                "student2": {
-                    "first_name": "Jon",
-                    "last_name": "Doe",
-                    "date_of_birth": "2005-03-15"
-                }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "student1": {
+                "first_name": "John",
+                "last_name": "Doe",
+                "date_of_birth": "2005-03-15"
+            },
+            "student2": {
+                "first_name": "Jon",
+                "last_name": "Doe",
+                "date_of_birth": "2005-03-15"
             }
         }
+    })
+    
+    student1: StudentProfile
+    student2: StudentProfile
 
 
 class PairwiseSimilarityResponse(BaseModel):
@@ -451,7 +450,8 @@ class BatchProcessRequest(BaseModel):
     students: List[StudentProfile]
     threshold: Optional[float] = Field(0.85, ge=0.0, le=1.0)
     
-    @validator('students')
+    @field_validator('students')
+    @classmethod
     def validate_students_count(cls, v):
         if len(v) > 1000:
             raise ValueError('Maximum 1000 students per batch')
@@ -671,6 +671,305 @@ async def batch_process_duplicates(request: BatchProcessRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Batch processing failed: {str(e)}"
+        )
+
+
+# ============================================================================
+# EXPLAINABILITY DASHBOARD ENDPOINTS (Task 3.4.2)
+# ============================================================================
+
+class DashboardRequest(BaseModel):
+    """Request for dashboard data"""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "model_name": "duplicate-detector",
+            "time_range_days": 7
+        }
+    })
+    
+    model_name: str
+    time_range_days: int = Field(7, ge=1, le=365, description="Number of days to analyze")
+
+
+class AccuracyMetrics(BaseModel):
+    """Model accuracy metrics"""
+    model_name: str
+    time_range_days: int
+    total_predictions: int
+    correct_predictions: Optional[int] = None
+    accuracy: Optional[float] = None
+    accuracy_percentage: Optional[float] = None
+    message: Optional[str] = None
+
+
+class ConfidenceDistribution(BaseModel):
+    """Confidence score distribution"""
+    model_name: str
+    time_range_days: int
+    total_predictions: int
+    avg_confidence: Optional[float] = None
+    median_confidence: Optional[float] = None
+    min_confidence: Optional[float] = None
+    max_confidence: Optional[float] = None
+    distribution: List[Dict[str, Any]]
+    message: Optional[str] = None
+
+
+class BiasMetrics(BaseModel):
+    """Bias and fairness metrics"""
+    model_name: str
+    time_range_days: int
+    bias_detected: bool
+    demographic_analysis: Optional[List[Dict[str, Any]]] = None
+    total_predictions_analyzed: Optional[int] = None
+    message: Optional[str] = None
+
+
+class SHAPSummary(BaseModel):
+    """SHAP values summary"""
+    model_name: str
+    time_range_days: int
+    total_predictions_analyzed: Optional[int] = None
+    top_features: Optional[List[Dict[str, Any]]] = None
+    message: Optional[str] = None
+
+
+class HistoricalTrends(BaseModel):
+    """Historical performance trends"""
+    model_name: str
+    days: int
+    interval_days: Optional[int] = None
+    data_points: Optional[List[Dict[str, Any]]] = None
+    message: Optional[str] = None
+
+
+class DashboardSummary(BaseModel):
+    """Complete dashboard summary"""
+    model_name: str
+    time_range_days: int
+    generated_at: str
+    accuracy_metrics: Dict[str, Any]
+    confidence_distribution: Dict[str, Any]
+    bias_metrics: Dict[str, Any]
+    shap_summary: Dict[str, Any]
+    historical_trends: Dict[str, Any]
+
+
+@app.get("/api/v1/dashboard/accuracy/{model_name}", response_model=AccuracyMetrics, tags=["Explainability Dashboard"])
+async def get_model_accuracy(
+    model_name: str,
+    time_range_days: int = Query(7, ge=1, le=365, description="Number of days to analyze")
+):
+    """
+    Get model accuracy metrics
+    
+    Task 3.4.2: AI Explainability Dashboard
+    
+    Returns:
+    - Total predictions
+    - Correct predictions
+    - Accuracy percentage
+    - Time range analyzed
+    """
+    try:
+        dashboard = get_explainability_dashboard()
+        metrics = dashboard.get_model_accuracy(model_name, time_range_days)
+        return AccuracyMetrics(**metrics)
+    except Exception as e:
+        logger.error(f"Error getting model accuracy: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get model accuracy: {str(e)}"
+        )
+
+
+@app.get("/api/v1/dashboard/confidence/{model_name}", response_model=ConfidenceDistribution, tags=["Explainability Dashboard"])
+async def get_confidence_distribution(
+    model_name: str,
+    time_range_days: int = Query(7, ge=1, le=365, description="Number of days to analyze"),
+    num_bins: int = Query(10, ge=5, le=20, description="Number of histogram bins")
+):
+    """
+    Get confidence score distribution
+    
+    Task 3.4.2: AI Explainability Dashboard
+    
+    Returns:
+    - Average confidence
+    - Median confidence
+    - Min/max confidence
+    - Distribution histogram
+    """
+    try:
+        dashboard = get_explainability_dashboard()
+        distribution = dashboard.get_confidence_distribution(model_name, time_range_days, num_bins)
+        return ConfidenceDistribution(**distribution)
+    except Exception as e:
+        logger.error(f"Error getting confidence distribution: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get confidence distribution: {str(e)}"
+        )
+
+
+@app.get("/api/v1/dashboard/bias/{model_name}", response_model=BiasMetrics, tags=["Explainability Dashboard"])
+async def get_bias_metrics(
+    model_name: str,
+    time_range_days: int = Query(7, ge=1, le=365, description="Number of days to analyze")
+):
+    """
+    Get bias and fairness metrics
+    
+    Task 3.4.2: AI Explainability Dashboard
+    
+    Tracks AI accuracy across demographics to detect algorithmic bias:
+    - Accuracy by demographic group
+    - Confidence by demographic group
+    - Bias detection (accuracy variance > 10%)
+    - Recommendations for bias mitigation
+    
+    Critical for compliance and ethical AI governance.
+    """
+    try:
+        dashboard = get_explainability_dashboard()
+        metrics = dashboard.get_bias_metrics(model_name, time_range_days)
+        return BiasMetrics(**metrics)
+    except Exception as e:
+        logger.error(f"Error getting bias metrics: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get bias metrics: {str(e)}"
+        )
+
+
+@app.get("/api/v1/dashboard/shap/{model_name}", response_model=SHAPSummary, tags=["Explainability Dashboard"])
+async def get_shap_summary(
+    model_name: str,
+    time_range_days: int = Query(7, ge=1, le=365, description="Number of days to analyze"),
+    top_n: int = Query(10, ge=1, le=50, description="Number of top features to return")
+):
+    """
+    Get SHAP values summary (feature importance)
+    
+    Task 3.4.2: AI Explainability Dashboard
+    
+    SHAP (SHapley Additive exPlanations) values explain:
+    - Which features contribute most to predictions
+    - Average importance of each feature
+    - Feature ranking by impact
+    
+    Essential for model interpretability and debugging.
+    """
+    try:
+        dashboard = get_explainability_dashboard()
+        summary = dashboard.get_shap_summary(model_name, time_range_days, top_n)
+        return SHAPSummary(**summary)
+    except Exception as e:
+        logger.error(f"Error getting SHAP summary: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get SHAP summary: {str(e)}"
+        )
+
+
+@app.get("/api/v1/dashboard/trends/{model_name}", response_model=HistoricalTrends, tags=["Explainability Dashboard"])
+async def get_historical_trends(
+    model_name: str,
+    days: int = Query(30, ge=1, le=365, description="Number of days to analyze"),
+    interval_days: int = Query(1, ge=1, le=30, description="Interval for data points")
+):
+    """
+    Get historical performance trends
+    
+    Task 3.4.2: AI Explainability Dashboard
+    
+    Returns time-series data showing:
+    - Model accuracy over time
+    - Confidence scores over time
+    - Prediction volume over time
+    
+    Useful for detecting model degradation and performance issues.
+    """
+    try:
+        dashboard = get_explainability_dashboard()
+        trends = dashboard.get_historical_trends(model_name, days, interval_days)
+        return HistoricalTrends(**trends)
+    except Exception as e:
+        logger.error(f"Error getting historical trends: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get historical trends: {str(e)}"
+        )
+
+
+@app.post("/api/v1/dashboard/summary", response_model=DashboardSummary, tags=["Explainability Dashboard"])
+async def get_dashboard_summary(request: DashboardRequest):
+    """
+    Get comprehensive dashboard summary
+    
+    Task 3.4.2: AI Explainability Dashboard
+    
+    Returns complete dashboard data including:
+    - Model accuracy metrics
+    - Confidence distribution
+    - Bias and fairness metrics
+    - SHAP value summary
+    - Historical trends
+    
+    This is the primary endpoint for the explainability dashboard UI.
+    """
+    try:
+        dashboard = get_explainability_dashboard()
+        summary = dashboard.generate_dashboard_summary(
+            request.model_name,
+            request.time_range_days
+        )
+        return DashboardSummary(**summary)
+    except Exception as e:
+        logger.error(f"Error generating dashboard summary: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate dashboard summary: {str(e)}"
+        )
+
+
+@app.get("/api/v1/dashboard/export/{model_name}", tags=["Explainability Dashboard"])
+async def export_dashboard_report(
+    model_name: str,
+    time_range_days: int = Query(7, ge=1, le=365, description="Number of days to analyze"),
+    format: str = Query("json", pattern="^(json|summary)$", description="Export format")
+):
+    """
+    Export dashboard report for compliance audits
+    
+    Task 3.4.2: AI Explainability Dashboard
+    
+    Formats:
+    - json: Complete data in JSON format
+    - summary: Human-readable summary with full data
+    
+    Exported reports include:
+    - Model performance metrics
+    - Bias analysis
+    - SHAP values
+    - Historical trends
+    - Timestamp and report ID
+    
+    Essential for SOC 2, GDPR, and AI governance compliance.
+    """
+    try:
+        dashboard = get_explainability_dashboard()
+        report = dashboard.export_dashboard_report(
+            model_name,
+            time_range_days,
+            format
+        )
+        return report
+    except Exception as e:
+        logger.error(f"Error exporting dashboard report: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to export dashboard report: {str(e)}"
         )
 
 
