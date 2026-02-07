@@ -286,5 +286,124 @@ describe('Approval Queue API Routes', () => {
             expect(response.status).toBe(200);
             expect(response.body.expired_count).toBe(3);
         });
+
+        it('should return 500 on service error', async () => {
+            approvalQueueService.expireOldRecommendations.mockRejectedValue(
+                new Error('Database error')
+            );
+
+            const response = await request(app)
+                .post('/api/v1/approvals/expire');
+
+            expect(response.status).toBe(500);
+            expect(response.body.error).toBe('Failed to expire recommendations');
+        });
+    });
+
+    // Additional error handling tests
+    describe('Error handling', () => {
+        it('POST /recommendations should return 500 on service error', async () => {
+            approvalQueueService.createRecommendation.mockRejectedValue(
+                new Error('Database error')
+            );
+
+            const response = await request(app)
+                .post('/api/v1/approvals/recommendations')
+                .send({
+                    recommendationType: 'duplicate_detection',
+                    recommendationText: 'Test',
+                    confidenceScore: 0.85
+                });
+
+            expect(response.status).toBe(500);
+            expect(response.body.error).toBe('Failed to create recommendation');
+        });
+
+        it('GET /recommendations should return 500 on service error', async () => {
+            approvalQueueService.getRecommendations.mockRejectedValue(
+                new Error('Database error')
+            );
+
+            const response = await request(app)
+                .get('/api/v1/approvals/recommendations');
+
+            expect(response.status).toBe(500);
+            expect(response.body.error).toBe('Failed to get recommendations');
+        });
+
+        it('GET /recommendations/:id should return 500 on service error', async () => {
+            approvalQueueService.getRecommendationById.mockRejectedValue(
+                new Error('Database error')
+            );
+
+            const response = await request(app)
+                .get('/api/v1/approvals/recommendations/rec-123');
+
+            expect(response.status).toBe(500);
+            expect(response.body.error).toBe('Failed to get recommendation');
+        });
+
+        it('POST /approve should return 500 on service error', async () => {
+            approvalQueueService.approveRecommendation.mockRejectedValue(
+                new Error('Database error')
+            );
+
+            const response = await request(app)
+                .post('/api/v1/approvals/recommendations/rec-123/approve')
+                .send({ reason: 'Approved' });
+
+            expect(response.status).toBe(500);
+            expect(response.body.error).toBe('Failed to approve recommendation');
+        });
+
+        it('POST /reject should return 500 on service error', async () => {
+            approvalQueueService.rejectRecommendation.mockRejectedValue(
+                new Error('Database error')
+            );
+
+            const response = await request(app)
+                .post('/api/v1/approvals/recommendations/rec-123/reject')
+                .send({ reason: 'Rejected' });
+
+            expect(response.status).toBe(500);
+            expect(response.body.error).toBe('Failed to reject recommendation');
+        });
+
+        it('POST /request-info should return 500 on service error', async () => {
+            approvalQueueService.requestMoreInfo.mockRejectedValue(
+                new Error('Database error')
+            );
+
+            const response = await request(app)
+                .post('/api/v1/approvals/recommendations/rec-123/request-info')
+                .send({ reason: 'Need more info' });
+
+            expect(response.status).toBe(500);
+            expect(response.body.error).toBe('Failed to request more information');
+        });
+
+        it('GET /stats should return 500 on service error', async () => {
+            approvalQueueService.getQueueStats.mockRejectedValue(
+                new Error('Database error')
+            );
+
+            const response = await request(app)
+                .get('/api/v1/approvals/stats');
+
+            expect(response.status).toBe(500);
+            expect(response.body.error).toBe('Failed to get queue statistics');
+        });
+
+        it('GET /audit should return 500 on service error', async () => {
+            approvalQueueService.getAuditLog.mockRejectedValue(
+                new Error('Database error')
+            );
+
+            const response = await request(app)
+                .get('/api/v1/approvals/recommendations/rec-123/audit');
+
+            expect(response.status).toBe(500);
+            expect(response.body.error).toBe('Failed to get audit log');
+        });
     });
 });

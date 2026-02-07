@@ -34,6 +34,9 @@ class GovernanceManager:
     - AI Kill Switch
     """
     
+    # Redis key for kill switch status
+    KILL_SWITCH_KEY = "ai:kill_switch:status"
+    
     def __init__(self, redis_client=None):
         """
         Initialize governance manager
@@ -46,7 +49,9 @@ class GovernanceManager:
         self.recommendations: Dict[str, AIRecommendation] = {}
         self.approvals: Dict[str, ApprovalResponse] = {}
         self.audit_logs: List[AuditLogEntry] = []
-        self.kill_switch_status = AIKillSwitchStatus(enabled=True)
+        
+        # Initialize kill switch from Redis or default to enabled
+        self.kill_switch_status = self._load_kill_switch_status()
     
     def check_kill_switch(self) -> bool:
         """
@@ -223,7 +228,13 @@ class GovernanceManager:
             logger.warning(f"AI Kill Switch ACTIVATED by {toggle_request.toggled_by}: {toggle_request.reason}")
         else:
             # AI is being enabled
+            self.kill_switch_status.disabled_at = None
+            self.kill_switch_status.disabled_by = None
+            self.kill_switch_status.reason = None
             logger.info(f"AI Kill Switch DEACTIVATED by {toggle_request.toggled_by}")
+        
+        # Save to Redis
+        self._save_kill_switch_status()
         
         # Log to audit trail
         self._log_kill_switch_toggle(toggle_request)
@@ -323,6 +334,46 @@ class GovernanceManager:
             }
         )
         self.audit_logs.append(log_entry)
+    
+    def _load_kill_switch_status(self) -> AIKillSwitchStatus:
+        """
+        Load kill switch status from Redis
+        
+        Returns:
+            AIKillSwitchStatus: Current kill switch status
+        """
+        if self.redis_client:
+            try:
+                import redis
+                status_json = self.redis_client.get(self.KILL_SWITCH_KEY)
+                if status_json:
+                    status_dict = json.loads(status_json)
+                    # Convert ISO strings back to datetime
+                    if status_dict.get('disabled_at'):
+                        status_dict['disabled_at'] = datetime.fromisoformat(status_dict['disabled_at'])
+                    return AIKillSwitchStatus(**status_dict)
+            except Exception as e:
+                logger.error(f"Failed to load kill switch status from Redis: {e}")
+        
+        # Default to enabled
+        return AIKillSwitchStatus(enabled=True)
+    
+    def _save_kill_switch_status(self):
+        """
+        Save kill switch status to Redis
+        """
+        if self.redis_client:
+            try:
+                # Convert to dict and handle datetime serialization
+                status_dict = self.kill_switch_status.model_dump()
+                if status_dict.get('disabled_at'):
+                    status_dict['disabled_at'] = status_dict['disabled_at'].isoformat()
+                
+                status_json = json.dumps(status_dict)
+                self.redis_client.set(self.KILL_SWITCH_KEY, status_json)
+                logger.info("Kill switch status saved to Redis")
+            except Exception as e:
+                logger.error(f"Failed to save kill switch status to Redis: {e}")
 
 
 # Global governance manager instance

@@ -121,6 +121,11 @@ const domainRoutes = require('./routes/domains');
 const hierarchyRoutes = require('./routes/hierarchy');
 app.use('/api/v1/hierarchy', hierarchyRoutes);
 
+// Webhook routes (NO tenant context - webhooks come from external services)
+// Must be registered BEFORE tenant context middleware
+const webhookRoutes = require('./routes/webhooks');
+app.use('/api/v1/webhooks', webhookRoutes);
+
 // Apply tenant context middleware to all /api routes
 app.use('/api', tenantContext);
 
@@ -154,6 +159,10 @@ app.use('/api/v1/merges', mergeRoutes);
 // Approval queue routes (require tenant context)
 const approvalQueueRoutes = require('./routes/approvalQueue');
 app.use('/api/v1/approvals', approvalQueueRoutes);
+
+// Payment routes (require tenant context)
+const paymentRoutes = require('./routes/payments');
+app.use('/api/v1/payments', paymentRoutes);
 
 app.get('/api/students', async (req, res) => {
   // RLS automatically filters by tenant_id

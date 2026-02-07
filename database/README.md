@@ -58,7 +58,10 @@ database/
 │   ├── 006_rbac_hierarchy_rollback.sql        # RBAC rollback
 │   ├── 007_mfa_support.sql                    # MFA support ✅
 │   ├── 007_mfa_support_rollback.sql           # MFA rollback
-│   └── 008_hierarchy_entities.sql             # Organizational hierarchy ✅
+│   ├── 015_approval_queue.sql                 # AI approval queue ✅
+   ├── 015_approval_queue_rollback.sql        # Approval queue rollback
+   ├── 016_payment_gateway.sql                # Payment gateway ✅
+   └── 016_payment_gateway_rollback.sql       # Payment gateway rollback
 ├── tests/                              # Test suites
 │   └── rls_isolation.test.sql         # RLS isolation tests
 └── docs/                               # Documentation
@@ -169,6 +172,48 @@ database/
     - Parent: Program
     - Capacity and date management
 
+### Phase 3: Intelligence Layer (Tasks 3.1.1 - 3.4.3) ✅
+
+#### Duplicate Detection & Merge Operations (Tasks 3.2.1 - 3.3.3)
+
+19. **duplicate_review_queue** - Duplicate detection queue
+    - Stores potential duplicate student pairs
+    - Confidence scores and reason codes
+    - Status tracking (pending, approved, rejected, merged)
+
+20. **merge_snapshots** - Pre-merge cryptographic snapshots
+    - SHA-256 hashed snapshots before merge
+    - Immutable audit trail
+    - Enables merge reversibility
+
+21. **student_merges** - Student merge operations
+    - Tracks merge operations
+    - Bidirectional references (primary ↔ secondary)
+    - Impact assessment data
+
+#### AI Governance (Tasks 3.4.1 - 3.4.3)
+
+22. **ai_approval_queue** - AI recommendation approval queue
+    - Human-in-the-loop workflow
+    - Explainability metadata
+    - Approval tokens for write operations
+
+### Phase 4: Commercialization & Security (Tasks 4.1.1 - 4.1.2) ✅
+
+#### Payment & Billing (Tasks 4.1.1 - 4.1.2)
+
+23. **payments** - Payment transactions
+    - Stripe and Razorpay integration
+    - Multiple payment methods (card, UPI, net banking, wallets, EMI)
+    - Idempotency keys for duplicate prevention
+    - RLS-protected
+
+24. **webhook_logs** - Webhook event logs
+    - All received webhooks stored for 90 days
+    - Idempotency key: webhook_id + tenant_id
+    - Retry tracking with exponential backoff
+    - Automatic cleanup after 90 days
+
 ### Security Features
 
 - ✅ Row-Level Security (RLS) enabled on all core tables (Task 1.1.1)
@@ -181,6 +226,9 @@ database/
 - ✅ Hashed backup codes (SHA-256) (Task 1.3.4)
 - ✅ Cascade delete protection on hierarchy (Task 2.1.1)
 - ✅ Circular reference prevention (Task 2.1.1)
+- ✅ Cryptographic snapshots for merge operations (Task 3.3.1)
+- ✅ Webhook signature verification (HMAC-SHA256) (Task 4.1.2)
+- ✅ Idempotent webhook processing (Task 4.1.2)
 
 ### Database Functions
 
@@ -188,6 +236,7 @@ database/
 - `check_circular_reference()` - Prevent circular references in hierarchy (Task 2.1.1)
 - `get_user_permissions()` - Resolve user permissions with role inheritance (Task 1.3.2)
 - `check_role_hierarchy()` - Validate role hierarchy constraints (Task 1.3.2)
+- `cleanup_old_webhook_logs()` - Automatic cleanup of webhook logs after 90 days (Task 4.1.2)
 
 ### Extensions
 

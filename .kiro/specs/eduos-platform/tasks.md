@@ -320,7 +320,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - Historical trend charts: model performance over time
     - Export: PDF report for compliance audits
 
-- [ ] 3.4.3 Create AI Kill Switch mechanism
+- [x] 3.4.3 Create AI Kill Switch mechanism
   - **Definition of Done:**
     - SuperAdmin UI: toggle to disable all AI services
     - Kill switch sets global flag in Redis (checked on every AI request)
@@ -334,7 +334,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
 
 ### 4.1 Billing Engine
 
-- [ ] 4.1.1 Integrate payment gateway (Stripe/Razorpay)
+- [x] 4.1.1 Integrate payment gateway (Stripe/Razorpay)
   - **Definition of Done:**
     - Stripe or Razorpay SDK integrated
     - Payment methods: credit card, debit card, UPI, net banking
@@ -343,7 +343,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - Test mode: sandbox environment for development
 
 
-- [ ] 4.1.2 Implement idempotent webhook processing
+- [x] 4.1.2 Implement idempotent webhook processing
   - **Definition of Done:**
     - Idempotency key: `webhook_id + tenant_id`
     - Duplicate webhooks rejected (return 200 OK without processing)
