@@ -490,6 +490,11 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 - [Task 3.4.1](docs/tasks/TASK_3.4.1_IMPLEMENTATION_SUMMARY.md) - AI Approval Queue System ✅
 - [Task 3.4.2](docs/tasks/TASK_3.4.2_IMPLEMENTATION_SUMMARY.md) - AI Explainability Dashboard ✅
 - [Task 3.4.3](docs/tasks/TASK_3.4.3_IMPLEMENTATION_SUMMARY.md) - AI Kill Switch Mechanism ✅
+- [Task 4.1.1](docs/tasks/TASK_4.1.1_IMPLEMENTATION_SUMMARY.md) - Payment Gateway Integration ✅
+- [Task 4.1.2](docs/tasks/TASK_4.1.2_IMPLEMENTATION_SUMMARY.md) - Idempotent Webhook Processing ✅
+- [Task 4.1.3](docs/tasks/TASK_4.1.3_IMPLEMENTATION_SUMMARY.md) - Invoice Generation with Sequential Numbering ✅
+- [Task 4.1.4](docs/tasks/TASK_4.1.4_IMPLEMENTATION_SUMMARY.md) - Refund Workflow with Approval Chain ✅
+- [Task 4.1.5](docs/tasks/TASK_4.1.5_IMPLEMENTATION_SUMMARY.md) - Bank Reconciliation UI ✅
 
 **Authentication:**
 - [Auth Service](docs/AUTH_SERVICE.md) - OAuth2/OIDC authentication service
@@ -498,6 +503,17 @@ NOTICE:  TEST 10 PASSED: RLS overhead is 0.8 ms (< 5ms target)
 - [Session Management](docs/SESSION_MANAGEMENT.md) - Redis-backed session handling
 - [MFA System](docs/MFA_SYSTEM.md) - Multi-factor authentication documentation
 - [MFA Quick Start](docs/MFA_QUICK_START.md) - Developer quick reference for MFA
+
+**Payments & Invoicing:**
+- [Payment Gateway](docs/PAYMENT_GATEWAY.md) - Stripe and Razorpay integration
+- [Payment Quick Start](docs/PAYMENT_QUICK_START.md) - Developer quick reference
+- [Webhook Retry System](docs/WEBHOOK_RETRY_SYSTEM.md) - Idempotent webhook processing
+- [Invoice Generation](docs/INVOICE_GENERATION.md) - Sequential invoice numbering system
+- [Invoice Quick Start](docs/INVOICE_QUICK_START.md) - Developer quick reference for invoices
+- [Refund Workflow](docs/REFUND_WORKFLOW.md) - Refund approval chain and processing
+- [Refund Testing Guide](docs/REFUND_TESTING.md) - Testing refund functionality
+- [Bank Reconciliation](docs/BANK_RECONCILIATION.md) - Bank statement reconciliation system
+- [Bank Reconciliation Quick Start](docs/BANK_RECONCILIATION_QUICK_START.md) - Developer quick reference
 
 **Domain & Caching:**
 - [Domain Mapping](docs/DOMAIN_MAPPING.md) - Custom domain resolution
@@ -568,7 +584,7 @@ All organizational structure, schema engine, and attendance tasks completed. See
 
 ### Phase 4: Commercialization & Security (Weeks 13-16)
 
-**Status:** 2/17 tasks complete (12%)
+**Status:** 5/17 tasks complete (29%)
 
 #### ✅ Task 4.1.1: Payment Gateway Integration - COMPLETED
 - ✅ Stripe and Razorpay SDK integrated
@@ -592,10 +608,39 @@ All organizational structure, schema engine, and attendance tasks completed. See
 - ✅ 58 unit tests passing (100% coverage)
 - ✅ Comprehensive documentation
 
+#### ✅ Task 4.1.3: Invoice Generation with Sequential Numbering - COMPLETED
+- ✅ Invoice format: `INV-{YYYY}-{MM}-{NNNN}` (e.g., INV-2026-02-0001)
+- ✅ Sequential numbering per tenant (no gaps)
+- ✅ Gap detection: alert if sequence broken
+- ✅ Invoice includes: line items, taxes, discounts, total
+- ✅ PDF generation: branded invoice template
+- ✅ Indian GST support (CGST, SGST, IGST)
+- ✅ Thread-safe invoice number generation
+- ✅ 31 unit tests passing (100% coverage)
+- ✅ Database migration 017 with RLS-enabled tables
+- ✅ Comprehensive documentation
+
+#### ✅ Task 4.1.4: Refund Workflow with Approval Chain - COMPLETED
+- ✅ Three-tier approval chain: Teacher → Admin → Finance Manager
+- ✅ Refund types: full and partial refunds
+- ✅ Support for payment-based and invoice-based refunds
+- ✅ Gateway integration: Razorpay and Stripe refund processing
+- ✅ Credit note generation with sequential numbering
+- ✅ Approval history tracking with audit trail
+- ✅ 58 route tests + 81 service tests passing (100% route coverage, 92% service coverage)
+- ✅ Database migration 018 with RLS-enabled tables
+- ✅ Comprehensive documentation
+
+#### 🎯 Test Coverage Improvements - COMPLETED
+- ✅ **refunds.js routes**: 100% coverage (was 77.98%)
+- ✅ **paymentService.js**: 92.04% statements, 82.02% branches, 100% functions
+- ✅ 142 total tests passing across payment functionality
+- ✅ Comprehensive edge case and error handling coverage
+- ✅ All validation paths tested
+- ✅ Transaction rollback scenarios verified
+
 #### Remaining Tasks
-- [ ] 4.1.3: Invoice generation with sequential numbering
-- [ ] 4.1.4: Refund workflow with approval chain
-- [ ] 4.1.5: Bank reconciliation UI
+- [x] 4.1.5: Bank reconciliation UI - COMPLETED ✅
 - [ ] 4.2.1-4.2.3: Audit engine with tamper-evident logs
 - [ ] 4.3.1-4.3.5: Security hardening
 - [ ] 4.4.1-4.4.5: Production readiness
@@ -685,6 +730,6 @@ Built with:
 
 ---
 
-**Project Status:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 Complete ✅ | Phase 4: 2/17 (12%) 🚀  
+**Project Status:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 Complete ✅ | Phase 4: 5/17 (29%) 🚀  
 **Next Milestone:** Phase 4 - Billing Engine & Security Hardening  
 **Last Updated:** 2026-02-07

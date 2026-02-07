@@ -312,7 +312,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - Queue filters: by type, confidence, date
 
 
-- [x] 3.4.2 Implement AI explainability dashboard
+- [x] nexplainability dashboard
   - **Definition of Done:**
     - Dashboard displays: model accuracy, confidence distribution, bias metrics
     - SHAP value visualization for individual predictions
@@ -351,7 +351,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - Retry logic: exponential backoff for failed webhooks
     - Webhook log: all received webhooks stored for 90 days
 
-- [ ] 4.1.3 Build invoice generation with sequential numbering
+- [x] 4.1.3 Build invoice generation with sequential numbering
   - **Definition of Done:**
     - Invoice format: `INV-{YYYY}-{MM}-{NNNN}` (e.g., INV-2026-02-0001)
     - Sequential numbering per tenant (no gaps)
@@ -359,7 +359,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - Invoice includes: line items, taxes, discounts, total
     - PDF generation: branded invoice template
 
-- [ ] 4.1.4 Create refund workflow with approval chain
+- [x] 4.1.4 Create refund workflow with approval chain
   - **Definition of Done:**
     - Refund request form: amount, reason, supporting documents
     - Approval chain: Teacher → Admin → Finance Manager
@@ -368,7 +368,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - Notification: email to student/guardian on refund completion
 
 
-- [ ] 4.1.5 Implement bank reconciliation UI
+- [x] 4.1.5 Implement bank reconciliation UI
   - **Definition of Done:**
     - Upload bank statement (CSV/Excel)
     - Auto-match transactions with invoices

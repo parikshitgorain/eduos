@@ -168,6 +168,10 @@ eduos-platform/
 | [Task 3.4.3](tasks/TASK_3.4.3_IMPLEMENTATION_SUMMARY.md) | AI Kill Switch Mechanism | ✅ Complete |
 | [Task 4.1.1](tasks/TASK_4.1.1_IMPLEMENTATION_SUMMARY.md) | Payment Gateway Integration | ✅ Complete |
 | [Task 4.1.2](tasks/TASK_4.1.2_IMPLEMENTATION_SUMMARY.md) | Idempotent Webhook Processing | ✅ Complete |
+| [Task 4.1.3](tasks/TASK_4.1.3_IMPLEMENTATION_SUMMARY.md) | Invoice Generation with Sequential Numbering | ✅ Complete |
+| [Task 4.1.4](tasks/TASK_4.1.4_IMPLEMENTATION_SUMMARY.md) | Refund Workflow with Approval Chain | ✅ Complete |
+| [Task 4.1.5](tasks/TASK_4.1.5_IMPLEMENTATION_SUMMARY.md) | Bank Reconciliation UI | ✅ Complete |
+| [Test Coverage Improvements](tasks/TEST_COVERAGE_IMPROVEMENT_SUMMARY.md) | Refunds & Payment Service Coverage | ✅ Complete |
 | [Security Hardening](tasks/SECURITY_HARDENING_IMPLEMENTATION_SUMMARY.md) | Comprehensive Security Fixes | ✅ Complete |
 
 ### 6. Payment & Financial Documentation
@@ -177,6 +181,12 @@ eduos-platform/
 | [Payment Gateway Guide](PAYMENT_GATEWAY.md) | Complete payment integration guide | All |
 | [Payment Quick Start](PAYMENT_QUICK_START.md) | 5-minute quick start | Developers |
 | [Webhook Retry System](WEBHOOK_RETRY_SYSTEM.md) | Webhook retry and idempotency | Developers |
+| [Invoice Generation](INVOICE_GENERATION.md) | Sequential invoice numbering system | All |
+| [Invoice Quick Start](INVOICE_QUICK_START.md) | 5-minute quick start for invoices | Developers |
+| [Refund Workflow](REFUND_WORKFLOW.md) | Refund approval chain and processing | All |
+| [Refund Testing Guide](REFUND_TESTING.md) | Testing refund functionality | Developers |
+| [Bank Reconciliation](BANK_RECONCILIATION.md) | Bank statement reconciliation system | All |
+| [Bank Reconciliation Quick Start](BANK_RECONCILIATION_QUICK_START.md) | 5-minute quick start for reconciliation | Developers |
 
 ### 7. AI Service Documentation
 
@@ -225,6 +235,15 @@ eduos-platform/
 
 **...integrate payments**
 → [Payment Gateway Guide](PAYMENT_GATEWAY.md) → [Payment Quick Start](PAYMENT_QUICK_START.md)
+
+**...generate invoices**
+→ [Invoice Generation](INVOICE_GENERATION.md) → [Invoice Quick Start](INVOICE_QUICK_START.md)
+
+**...process refunds**
+→ [Refund Workflow](REFUND_WORKFLOW.md) → [Refund Testing Guide](REFUND_TESTING.md)
+
+**...reconcile bank statements**
+→ [Bank Reconciliation](BANK_RECONCILIATION.md) → [Bank Reconciliation Quick Start](BANK_RECONCILIATION_QUICK_START.md)
 
 **...check project status**
 → [Project Status](PROJECT_STATUS.md)
@@ -348,6 +367,10 @@ All documentation should include:
 - ✅ Task 3.4.2 Summary (AI Explainability Dashboard)
 - ✅ Task 3.4.3 Summary (AI Kill Switch Mechanism)
 - ✅ Task 4.1.1 Summary (Payment Gateway Integration)
+- ✅ Task 4.1.2 Summary (Idempotent Webhook Processing)
+- ✅ Task 4.1.3 Summary (Invoice Generation with Sequential Numbering)
+- ✅ Task 4.1.4 Summary (Refund Workflow with Approval Chain)
+- ✅ Task 4.1.5 Summary (Bank Reconciliation UI)
 - ✅ Security Hardening Implementation Summary
 - ✅ Security Guide
 - ✅ Security Fixes Report
@@ -410,4 +433,4 @@ If you find issues with documentation:
 
 **Last Updated:** 2026-02-07  
 **Documentation Version:** 1.0  
-**Project Phase:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 Complete ✅ | Phase 4: 2/17 (12%) 🚀
+**Project Phase:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 Complete ✅ | Phase 4: 5/17 (29%) 🚀
