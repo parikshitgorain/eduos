@@ -178,6 +178,8 @@ eduos-platform/
 | [Task 4.3.2](tasks/TASK_4.3.2_IMPLEMENTATION_SUMMARY.md) | SQL Injection and XSS Protection | ✅ Complete |
 | [Task 4.3.3](tasks/TASK_4.3.3_IMPLEMENTATION_SUMMARY.md) | Encryption at Rest and In Transit | ✅ Complete |
 | [Task 4.3.2](tasks/TASK_4.3.2_IMPLEMENTATION_SUMMARY.md) | SQL Injection and XSS Protection | ✅ Complete |
+| [Task 4.3.3](tasks/TASK_4.3.3_IMPLEMENTATION_SUMMARY.md) | Encryption at Rest and In Transit | ✅ Complete |
+| [Task 4.3.4](tasks/TASK_4.3.4_IMPLEMENTATION_SUMMARY.md) | Penetration Testing on Custom Domain Routing | ✅ Complete |
 | [Test Coverage Improvements](tasks/TEST_COVERAGE_IMPROVEMENT_SUMMARY.md) | Refunds & Payment Service Coverage | ✅ Complete |
 | [Security Hardening](tasks/SECURITY_HARDENING_IMPLEMENTATION_SUMMARY.md) | Comprehensive Security Fixes | ✅ Complete |
 
@@ -249,6 +251,9 @@ eduos-platform/
 | [Encryption at Rest](ENCRYPTION_AT_REST.md) | Encryption implementation guide | All |
 | [Encryption Quick Start](ENCRYPTION_QUICK_START.md) | Quick reference for developers | Developers |
 | [Task 4.3.3](tasks/TASK_4.3.3_IMPLEMENTATION_SUMMARY.md) | Encryption implementation | Developers |
+| [Domain Routing Penetration Test Report](DOMAIN_ROUTING_PENTEST_REPORT.md) | Detailed vulnerability assessment | All |
+| [Domain Routing Penetration Test Summary](DOMAIN_ROUTING_PENTEST_SUMMARY.md) | Executive summary | All |
+| [Task 4.3.4](tasks/TASK_4.3.4_IMPLEMENTATION_SUMMARY.md) | Penetration testing implementation | Developers |
 
 | Script | Description | Usage |
 |--------|-------------|-------|
@@ -494,4 +499,4 @@ If you find issues with documentation:
 
 **Last Updated:** 2026-02-07  
 **Documentation Version:** 1.0  
-**Project Phase:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 Complete ✅ | Phase 4: 11/17 (65%) 🚀
+**Project Phase:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 Complete ✅ | Phase 4: 12/17 (71%) 🚀

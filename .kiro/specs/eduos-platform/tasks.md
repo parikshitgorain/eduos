@@ -430,7 +430,7 @@ This document outlines a **4-Phase Implementation Plan** for the EduOS Platform,
     - Encryption keys managed via KMS (AWS KMS, HashiCorp Vault)
     - Key rotation: automatic every 90 days
 
-- [ ] 4.3.4 Conduct penetration testing on custom domain routing
+- [x] 4.3.4 Conduct penetration testing on custom domain routing
   - **Definition of Done:**
     - Test scenarios: subdomain takeover, DNS spoofing, SSRF attacks
     - Vulnerability assessment report with severity ratings
