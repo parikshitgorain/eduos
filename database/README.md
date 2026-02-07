@@ -71,7 +71,9 @@ database/
    ├── 020_audit_log_system.sql               # Audit log system ✅
    ├── 020_audit_log_system_rollback.sql      # Audit log rollback
    ├── 021_encryption_at_rest.sql             # Encryption at rest ✅
-   └── 021_encryption_at_rest_rollback.sql    # Encryption rollback
+   ├── 021_encryption_at_rest_rollback.sql    # Encryption rollback
+   ├── 022_security_monitoring.sql            # Security monitoring ✅
+   └── 022_security_monitoring_rollback.sql   # Security monitoring rollback
 ├── tests/                              # Test suites
 │   └── rls_isolation.test.sql         # RLS isolation tests
 └── docs/                               # Documentation
@@ -208,7 +210,7 @@ database/
     - Explainability metadata
     - Approval tokens for write operations
 
-### Phase 4: Commercialization & Security (Tasks 4.1.1 - 4.1.2) ✅
+### Phase 4: Commercialization & Security (Tasks 4.1.1 - 4.3.5) ✅
 
 #### Payment & Billing (Tasks 4.1.1 - 4.1.2)
 
@@ -223,6 +225,44 @@ database/
     - Idempotency key: webhook_id + tenant_id
     - Retry tracking with exponential backoff
     - Automatic cleanup after 90 days
+
+#### Security Monitoring (Task 4.3.5)
+
+25. **security_events** - Security event tracking
+    - Real-time threat detection (brute force, impossible travel, privilege escalation)
+    - Event severity levels (low, medium, high, critical)
+    - Automatic correlation with user sessions
+    - RLS-protected
+
+26. **security_alerts** - Security alert management
+    - Alert rules with configurable thresholds
+    - Alert status tracking (open, acknowledged, resolved, false_positive)
+    - Integration with notification systems
+    - RLS-protected
+
+27. **security_incidents** - Security incident tracking
+    - Incident lifecycle management
+    - Severity classification and impact assessment
+    - Resolution tracking with root cause analysis
+    - RLS-protected
+
+28. **incident_timeline** - Incident timeline events
+    - Chronological event tracking for incidents
+    - Action logging with responsible parties
+    - Audit trail for incident response
+    - RLS-protected
+
+29. **alert_rules** - Alert rule configuration
+    - Configurable detection rules
+    - Threshold-based alerting
+    - Rule enable/disable management
+    - RLS-protected
+
+30. **threat_intelligence** - Threat intelligence data
+    - Known threat indicators (IPs, patterns)
+    - Threat type classification
+    - Confidence scoring
+    - RLS-protected
 
 ### Security Features
 
