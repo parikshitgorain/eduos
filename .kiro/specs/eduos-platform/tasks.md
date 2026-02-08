@@ -546,7 +546,7 @@ Each task is considered complete when:
 
 ### 5.1 Academic Policy & Rule Engine
 
-- [ ] 5.1.1 Build rule configuration engine
+- [x] 5.1.1 Build rule configuration engine
   - **Definition of Done:**
     - Rule types: attendance threshold, grade eligibility, grace marks
     - Rule format: JSON with conditions and actions
