@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { LoginForm } from '../components/LoginForm';
 import { useAuth } from '../hooks/useAuth';
+import { authService } from '../services/authService';
+import type { SSOProvider } from '../components/SSOButtons';
 
 /**
  * LoginPage Component
@@ -20,6 +22,19 @@ export function LoginPage() {
     navigate('/mfa', { state: { sessionId } });
   };
 
+  const handleSSOInitiate = async (provider: SSOProvider, tenantId: string) => {
+    try {
+      // Call SSO initiation endpoint
+      const response = await authService.initiateSSO(provider, tenantId);
+      
+      // Redirect to provider's authorization URL
+      window.location.href = response.authorizationUrl;
+    } catch (err) {
+      console.error('SSO initiation failed:', err);
+      // Error will be handled by the auth service
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
@@ -35,6 +50,7 @@ export function LoginPage() {
             onSuccess={handleSuccess}
             onMFARequired={handleMFARequired}
             onSubmit={login}
+            onSSOInitiate={handleSSOInitiate}
             isLoading={isLoading}
             error={error}
           />

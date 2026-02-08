@@ -10,6 +10,7 @@ vi.mock('../services/tenantService', () => ({
 const mockOnSuccess = vi.fn();
 const mockOnMFARequired = vi.fn();
 const mockOnSubmit = vi.fn().mockResolvedValue({ requiresMFA: false });
+const mockOnSSOInitiate = vi.fn().mockResolvedValue(undefined);
 
 describe('LoginForm', () => {
   it('renders login form with all required fields', () => {
@@ -18,12 +19,13 @@ describe('LoginForm', () => {
         onSuccess={mockOnSuccess}
         onMFARequired={mockOnMFARequired}
         onSubmit={mockOnSubmit}
+        onSSOInitiate={mockOnSSOInitiate}
       />
     );
 
     expect(screen.getByLabelText(/institution/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign In' })).toBeInTheDocument();
   });
 
   it('renders remember me checkbox', () => {
@@ -32,6 +34,7 @@ describe('LoginForm', () => {
         onSuccess={mockOnSuccess}
         onMFARequired={mockOnMFARequired}
         onSubmit={mockOnSubmit}
+        onSSOInitiate={mockOnSSOInitiate}
       />
     );
 
@@ -44,6 +47,7 @@ describe('LoginForm', () => {
         onSuccess={mockOnSuccess}
         onMFARequired={mockOnMFARequired}
         onSubmit={mockOnSubmit}
+        onSSOInitiate={mockOnSSOInitiate}
       />
     );
 
@@ -56,6 +60,7 @@ describe('LoginForm', () => {
         onSuccess={mockOnSuccess}
         onMFARequired={mockOnMFARequired}
         onSubmit={mockOnSubmit}
+        onSSOInitiate={mockOnSSOInitiate}
       />
     );
 

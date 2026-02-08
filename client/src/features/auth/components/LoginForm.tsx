@@ -7,6 +7,7 @@ import { TenantSelector } from './TenantSelector';
 import { PasswordInput } from './PasswordInput';
 import { ErrorDisplay } from '../../../shared/components/ErrorDisplay';
 import { ButtonLoadingIndicator } from '../../../shared/components/LoadingIndicator';
+import { SSOButtons, type SSOProvider } from './SSOButtons';
 
 /**
  * LoginForm component props
@@ -15,6 +16,7 @@ export interface LoginFormProps {
   onSuccess: () => void;
   onMFARequired: (sessionId: string) => void;
   onSubmit: (data: LoginFormData) => Promise<{ requiresMFA: boolean; sessionId?: string }>;
+  onSSOInitiate: (provider: SSOProvider, tenantId: string) => Promise<void>;
   isLoading?: boolean;
   error?: string | null;
 }
@@ -27,6 +29,7 @@ export function LoginForm({
   onSuccess,
   onMFARequired,
   onSubmit,
+  onSSOInitiate,
   isLoading = false,
   error = null,
 }: LoginFormProps) {
@@ -91,6 +94,16 @@ export function LoginForm({
 
       // Clear password field for security
       setValue('password', '');
+    }
+  };
+
+  const handleSSOInitiate = async (provider: SSOProvider) => {
+    if (!tenantId) return;
+    
+    try {
+      await onSSOInitiate(provider, tenantId);
+    } catch (err) {
+      console.error('SSO initiation failed:', err);
     }
   };
 
@@ -214,6 +227,14 @@ export function LoginForm({
           'Sign In'
         )}
       </button>
+
+      {/* SSO Buttons */}
+      <SSOButtons
+        tenantId={tenantId}
+        onInitiate={handleSSOInitiate}
+        disabled={isLoading}
+        isLoading={isLoading}
+      />
 
       {/* Contact Administrator Link */}
       <div className="text-center">

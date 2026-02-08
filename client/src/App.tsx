@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './features/auth/context/AuthContext';
 import { LoginPage } from './features/auth/pages/LoginPage';
+import { SSOCallbackPage } from './features/auth/pages/SSOCallbackPage';
 
 /**
  * Main App Component
@@ -12,6 +13,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth/callback" element={<SSOCallbackPage />} />
           <Route path="/" element={<Navigate to="/login" replace />} />
           {/* TODO: Add more routes (MFA, forgot password, dashboard, etc.) */}
         </Routes>
