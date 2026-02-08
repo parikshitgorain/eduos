@@ -12,6 +12,55 @@ const tenantService = require('../services/tenantService');
 const { getClient } = require('../config/database');
 
 /**
+ * GET /api/v1/tenants/search
+ * Search tenants by name or location
+ * 
+ * Query parameters:
+ * - q: Search query (minimum 2 characters)
+ */
+router.get('/search', async (req, res) => {
+  const client = await getClient();
+  
+  try {
+    const { q } = req.query;
+    
+    // Validate query
+    if (!q || q.trim().length < 2) {
+      return res.json({
+        tenants: []
+      });
+    }
+    
+    const searchQuery = `%${q.trim()}%`;
+    
+    // Search by name or location
+    const result = await client.query(
+      `SELECT tenant_id as id, name, location, logo_url as "logoUrl", contact_info as "contactInfo"
+       FROM tenants
+       WHERE status = 'active'
+         AND (name ILIKE $1 OR location ILIKE $1)
+       ORDER BY name
+       LIMIT 20`,
+      [searchQuery]
+    );
+    
+    res.json({
+      tenants: result.rows
+    });
+    
+  } catch (error) {
+    console.error('Error searching tenants:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to search tenants'
+    });
+  } finally {
+    client.release();
+  }
+});
+
+/**
  * POST /api/v1/tenants
  * Create a new tenant
  * 

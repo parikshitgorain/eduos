@@ -29,6 +29,346 @@ router.get('/.well-known/jwks.json', (req, res) => {
 });
 
 /**
+ * Email/Password Login
+ * POST /api/v1/auth/login
+ * 
+ * Request body:
+ * {
+ *   "tenantId": "uuid",
+ *   "email": "user@example.com",
+ *   "password": "password123",
+ *   "rememberMe": false,
+ *   "captchaToken": "optional"
+ * }
+ */
+router.post('/api/v1/auth/login', async (req, res) => {
+  try {
+    const { tenantId, email, password, rememberMe, captchaToken } = req.body;
+    
+    // Validate required fields
+    if (!tenantId || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: tenantId, email, and password are required'
+      });
+    }
+    
+    // TODO: Verify CAPTCHA if provided (after 3 failed attempts)
+    if (captchaToken) {
+      // CAPTCHA verification logic here
+    }
+    
+    // Find user
+    const userResult = await query(
+      `SELECT user_id, tenant_id, email, password_hash, mfa_enabled, status, roles
+       FROM users
+       WHERE email = $1 AND tenant_id = $2`,
+      [email, tenantId]
+    );
+    
+    if (userResult.rowCount === 0) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+    
+    const user = userResult.rows[0];
+    
+    // Check user status
+    if (user.status !== 'active') {
+      return res.status(403).json({
+        success: false,
+        message: 'Account is not active'
+      });
+    }
+    
+    // Verify password
+    const bcrypt = require('bcrypt');
+    const passwordValid = await bcrypt.compare(password, user.password_hash);
+    
+    if (!passwordValid) {
+      // TODO: Increment failed login counter for CAPTCHA
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+    
+    // Check if MFA is required
+    if (user.mfa_enabled) {
+      // Generate MFA session
+      const crypto = require('crypto');
+      const sessionId = crypto.randomUUID();
+      
+      // Store session in Redis with 5-minute expiry
+      const redis = require('../config/redis');
+      await redis.set(
+        `mfa_session:${sessionId}`,
+        JSON.stringify({ userId: user.user_id, tenantId: user.tenant_id }),
+        'EX',
+        300
+      );
+      
+      // TODO: Send MFA code via email/SMS
+      
+      return res.json({
+        success: true,
+        requiresMFA: true,
+        sessionId: sessionId
+      });
+    }
+    
+    // Generate JWT token
+    const expiresIn = rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60; // 30 days or 24 hours
+    
+    const token = authService.generateAccessToken({
+      userId: user.user_id,
+      tenantId: user.tenant_id,
+      email: user.email,
+      roles: user.roles,
+      permissions: []
+    }, expiresIn);
+    
+    // Log successful login
+    await query(
+      `INSERT INTO audit_logs (tenant_id, user_id, action, event_type, event_action, actor_type, actor_id, resource_type, details)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        user.tenant_id,
+        user.user_id,
+        'user_login',
+        'authentication',
+        'login',
+        'user',
+        user.user_id,
+        'authentication',
+        JSON.stringify({ method: 'email_password', ip_address: req.ip })
+      ]
+    );
+    
+    res.json({
+      success: true,
+      requiresMFA: false,
+      token: token
+    });
+    
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+/**
+ * MFA Verification
+ * POST /api/v1/auth/mfa/verify
+ * 
+ * Request body:
+ * {
+ *   "sessionId": "uuid",
+ *   "otp": "123456"
+ * }
+ */
+router.post('/api/v1/auth/mfa/verify', async (req, res) => {
+  try {
+    const { sessionId, otp } = req.body;
+    
+    if (!sessionId || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: sessionId and otp are required'
+      });
+    }
+    
+    // Get session from Redis
+    const redis = require('../config/redis');
+    const sessionData = await redis.get(`mfa_session:${sessionId}`);
+    
+    if (!sessionData) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired session'
+      });
+    }
+    
+    const session = JSON.parse(sessionData);
+    
+    // Verify OTP
+    const mfaService = require('../services/mfaService');
+    const valid = await mfaService.verifyTOTP(session.userId, otp);
+    
+    if (!valid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid verification code'
+      });
+    }
+    
+    // Delete session
+    await redis.del(`mfa_session:${sessionId}`);
+    
+    // Get user info
+    const userResult = await query(
+      `SELECT user_id, tenant_id, email, roles FROM users WHERE user_id = $1`,
+      [session.userId]
+    );
+    
+    const user = userResult.rows[0];
+    
+    // Generate JWT token
+    const token = authService.generateAccessToken({
+      userId: user.user_id,
+      tenantId: user.tenant_id,
+      email: user.email,
+      roles: user.roles,
+      permissions: []
+    });
+    
+    res.json({
+      success: true,
+      token: token
+    });
+    
+  } catch (error) {
+    console.error('MFA verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+/**
+ * Forgot Password
+ * POST /api/v1/auth/forgot-password
+ * 
+ * Request body:
+ * {
+ *   "email": "user@example.com",
+ *   "tenantId": "uuid" // optional
+ * }
+ */
+router.post('/api/v1/auth/forgot-password', async (req, res) => {
+  try {
+    const { email, tenantId } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+    
+    // Find user (don't reveal if user exists)
+    const userResult = await query(
+      `SELECT user_id, tenant_id, email, first_name
+       FROM users
+       WHERE email = $1 ${tenantId ? 'AND tenant_id = $2' : ''}`,
+      tenantId ? [email, tenantId] : [email]
+    );
+    
+    if (userResult.rowCount > 0) {
+      const user = userResult.rows[0];
+      
+      // Generate reset token
+      const crypto = require('crypto');
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      
+      // Store reset token
+      await query(
+        `INSERT INTO password_reset_tokens (user_id, token, expires_at)
+         VALUES ($1, $2, $3)`,
+        [user.user_id, resetToken, expiresAt]
+      );
+      
+      // TODO: Send email with reset link
+      console.log(`Password reset link: /reset-password?token=${resetToken}`);
+    }
+    
+    // Always return success (don't reveal if user exists)
+    res.json({
+      success: true,
+      message: 'If an account exists with that email, a password reset link has been sent.'
+    });
+    
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+/**
+ * SSO Initiation (Frontend-compatible endpoint)
+ * GET /api/v1/auth/sso/:provider
+ * 
+ * This is an alias for the existing OAuth2 endpoint to match frontend expectations
+ */
+router.get('/api/v1/auth/sso/:provider', async (req, res) => {
+  try {
+    const { provider } = req.params;
+    const { tenantId, redirectUri } = req.query;
+
+    if (!tenantId) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'tenantId query parameter is required',
+      });
+    }
+
+    // Validate provider
+    if (!['google', 'microsoft'].includes(provider)) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Invalid provider. Supported providers: google, microsoft',
+      });
+    }
+
+    // Verify tenant exists
+    const tenantResult = await query(
+      'SELECT tenant_id, name, status FROM tenants WHERE tenant_id = $1',
+      [tenantId]
+    );
+
+    if (tenantResult.rowCount === 0) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Tenant not found',
+      });
+    }
+
+    if (tenantResult.rows[0].status !== 'active') {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Tenant is not active',
+      });
+    }
+
+    // Generate authorization URL
+    const { url, state } = authService.getAuthorizationUrl(provider, tenantId, redirectUri);
+
+    // Return in frontend-expected format
+    res.json({
+      authorizationUrl: url,
+      state: state,
+      provider: provider,
+    });
+  } catch (error) {
+    console.error('SSO initiation error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message,
+    });
+  }
+});
+
+/**
  * Initiate OAuth2 login
  * GET /auth/:provider/login
  * 
