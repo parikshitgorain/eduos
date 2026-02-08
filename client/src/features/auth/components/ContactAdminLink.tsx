@@ -74,7 +74,7 @@ export function ContactAdminLink({
         <a
           href="#"
           onClick={handleOpenModal}
-          className="text-sm text-primary-600 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded px-2 py-2 min-h-[44px] inline-flex items-center"
+          className="text-sm text-slate-500 hover:text-slate-800 transition-colors block"
           aria-label="Contact administrator for help"
         >
           Contact administrator

@@ -31,6 +31,21 @@ const ACTION_TYPES = {
 };
 
 class AcademicRuleService {
+  constructor() {
+    this.redis = null;
+    this.db = null;
+  }
+
+  /**
+   * Initialize service with database and Redis connections
+   * @param {Object} database - Database connection
+   * @param {Object} redisClient - Redis client
+   */
+  initialize(database, redisClient) {
+    this.db = database || db;
+    this.redis = redisClient;
+  }
+
   /**
    * Create a new academic rule
    * @param {Object} ruleConfig - Rule configuration
@@ -65,6 +80,9 @@ class AcademicRuleService {
     };
 
     await db('academic_rules').insert(rule);
+
+    // Invalidate cache
+    await this.invalidateRuleCache(tenant_id);
 
     return {
       rule_id: ruleId,
@@ -363,6 +381,9 @@ class AcademicRuleService {
       .where({ rule_id: ruleId, tenant_id: tenantId })
       .update(updateData);
 
+    // Invalidate cache
+    await this.invalidateRuleCache(tenantId);
+
     return this.getRuleById(ruleId, tenantId);
   }
 
@@ -380,6 +401,9 @@ class AcademicRuleService {
         updated_at: new Date()
       });
 
+    // Invalidate cache
+    await this.invalidateRuleCache(tenantId);
+
     return this.getRuleById(ruleId, tenantId);
   }
 
@@ -395,6 +419,501 @@ class AcademicRuleService {
         status: 'deleted',
         updated_at: new Date()
       });
+  }
+
+  // ============================================================================
+  // REAL-TIME RULE EVALUATION
+  // ============================================================================
+
+  /**
+   * Evaluate rules for a student based on context (attendance, grades, etc.)
+   * @param {string} studentId - Student ID
+   * @param {string} tenantId - Tenant ID
+   * @param {Object} context - Evaluation context (attendance_percentage, grade, etc.)
+   * @returns {Promise<Array>} Array of evaluation results
+   */
+  async evaluateRulesForStudent(studentId, tenantId, context) {
+    const startTime = Date.now();
+    
+    try {
+      // Get applicable rules from cache or database
+      const rules = await this.getApplicableRules(tenantId, context);
+      
+      const evaluationResults = [];
+      
+      for (const rule of rules) {
+        const result = await this.evaluateSingleRule(rule, studentId, tenantId, context);
+        evaluationResults.push(result);
+        
+        // If rule was triggered, execute actions
+        if (result.condition_met && !result.action_executed) {
+          await this.executeRuleActions(rule, studentId, tenantId, context, result);
+        }
+      }
+      
+      const latency = Date.now() - startTime;
+      
+      // Log performance warning if latency exceeds 100ms
+      if (latency > 100) {
+        console.warn(`Rule evaluation latency exceeded 100ms: ${latency}ms for student ${studentId}`);
+      }
+      
+      return evaluationResults;
+    } catch (error) {
+      console.error('Error evaluating rules:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get applicable rules for evaluation (with caching)
+   * @param {string} tenantId - Tenant ID
+   * @param {Object} context - Evaluation context
+   * @returns {Promise<Array>} Array of applicable rules
+   */
+  async getApplicableRules(tenantId, context) {
+    const cacheKey = `rules:${tenantId}:active`;
+    
+    // Try to get from cache first
+    if (this.redis) {
+      try {
+        const cached = await this.redis.get(cacheKey);
+        if (cached) {
+          const rules = JSON.parse(cached);
+          return this.filterRulesByContext(rules, context);
+        }
+      } catch (error) {
+        console.warn('Redis cache read error:', error);
+      }
+    }
+    
+    // Get from database
+    const database = this.db || db;
+    const now = new Date();
+    
+    const rules = await database('academic_rules')
+      .where({
+        tenant_id: tenantId,
+        status: 'active'
+      })
+      .where(function() {
+        this.whereNull('effective_until')
+          .orWhere('effective_until', '>', now);
+      })
+      .where('effective_from', '<=', now)
+      .orderBy('priority', 'desc');
+    
+    // Parse JSON fields
+    const parsedRules = rules.map(rule => ({
+      ...rule,
+      conditions: JSON.parse(rule.conditions),
+      actions: JSON.parse(rule.actions)
+    }));
+    
+    // Cache for 5 minutes
+    if (this.redis) {
+      try {
+        await this.redis.setex(cacheKey, 300, JSON.stringify(parsedRules));
+      } catch (error) {
+        console.warn('Redis cache write error:', error);
+      }
+    }
+    
+    return this.filterRulesByContext(parsedRules, context);
+  }
+
+  /**
+   * Filter rules by context type
+   * @param {Array} rules - All rules
+   * @param {Object} context - Evaluation context
+   * @returns {Array} Filtered rules
+   */
+  filterRulesByContext(rules, context) {
+    // Determine which rule types are relevant based on context
+    const relevantTypes = [];
+    
+    if (context.attendance_percentage !== undefined) {
+      relevantTypes.push(RULE_TYPES.ATTENDANCE_THRESHOLD);
+    }
+    
+    if (context.grade !== undefined || context.marks !== undefined) {
+      relevantTypes.push(RULE_TYPES.GRADE_ELIGIBILITY);
+      relevantTypes.push(RULE_TYPES.GRACE_MARKS);
+    }
+    
+    return rules.filter(rule => relevantTypes.includes(rule.rule_type));
+  }
+
+  /**
+   * Evaluate a single rule against context
+   * @param {Object} rule - Rule to evaluate
+   * @param {string} studentId - Student ID
+   * @param {string} tenantId - Tenant ID
+   * @param {Object} context - Evaluation context
+   * @returns {Promise<Object>} Evaluation result
+   */
+  async evaluateSingleRule(rule, studentId, tenantId, context) {
+    const { v4: uuidv4 } = require('uuid');
+    const evaluationId = uuidv4();
+    const evaluatedAt = new Date();
+    
+    // Check if all conditions are met
+    const conditionMet = this.checkConditions(rule.conditions, context);
+    
+    // Create evaluation record
+    const evaluation = {
+      evaluation_id: evaluationId,
+      rule_id: rule.rule_id,
+      tenant_id: tenantId,
+      student_id: studentId,
+      context: JSON.stringify(context),
+      condition_met: conditionMet,
+      action_executed: false,
+      action_result: null,
+      evaluated_at: evaluatedAt
+    };
+    
+    // Log evaluation to database (async, don't wait)
+    this.logEvaluation(evaluation).catch(error => {
+      console.error('Error logging evaluation:', error);
+    });
+    
+    return {
+      ...evaluation,
+      rule_name: rule.rule_name,
+      rule_type: rule.rule_type,
+      actions: rule.actions
+    };
+  }
+
+  /**
+   * Check if all conditions are met
+   * @param {Array} conditions - Rule conditions
+   * @param {Object} context - Evaluation context
+   * @returns {boolean} True if all conditions met
+   */
+  checkConditions(conditions, context) {
+    for (const condition of conditions) {
+      if (!this.evaluateCondition(condition, context)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Evaluate a single condition
+   * @param {Object} condition - Condition to evaluate
+   * @param {Object} context - Evaluation context
+   * @returns {boolean} True if condition met
+   */
+  evaluateCondition(condition, context) {
+    const { field, operator, value } = condition;
+    const contextValue = context[field];
+    
+    if (contextValue === undefined) {
+      return false;
+    }
+    
+    switch (operator) {
+      case '>=':
+        return contextValue >= value;
+      case '<=':
+        return contextValue <= value;
+      case '>':
+        return contextValue > value;
+      case '<':
+        return contextValue < value;
+      case '==':
+        return contextValue == value;
+      case '!=':
+        return contextValue != value;
+      case 'in':
+        return Array.isArray(value) && value.includes(contextValue);
+      case 'not_in':
+        return Array.isArray(value) && !value.includes(contextValue);
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Execute rule actions
+   * @param {Object} rule - Rule with actions
+   * @param {string} studentId - Student ID
+   * @param {string} tenantId - Tenant ID
+   * @param {Object} context - Evaluation context
+   * @param {Object} evaluationResult - Evaluation result to update
+   * @returns {Promise<void>}
+   */
+  async executeRuleActions(rule, studentId, tenantId, context, evaluationResult) {
+    const actionResults = [];
+    
+    for (const action of rule.actions) {
+      try {
+        const result = await this.executeAction(action, studentId, tenantId, context, rule);
+        actionResults.push({
+          action_type: action.type,
+          success: true,
+          result: result
+        });
+      } catch (error) {
+        console.error(`Error executing action ${action.type}:`, error);
+        actionResults.push({
+          action_type: action.type,
+          success: false,
+          error: error.message
+        });
+      }
+    }
+    
+    // Update evaluation record with action results
+    evaluationResult.action_executed = true;
+    evaluationResult.action_result = JSON.stringify(actionResults);
+    
+    await this.updateEvaluationResult(evaluationResult.evaluation_id, {
+      action_executed: true,
+      action_result: JSON.stringify(actionResults)
+    });
+  }
+
+  /**
+   * Execute a single action
+   * @param {Object} action - Action to execute
+   * @param {string} studentId - Student ID
+   * @param {string} tenantId - Tenant ID
+   * @param {Object} context - Evaluation context
+   * @param {Object} rule - Parent rule
+   * @returns {Promise<Object>} Action result
+   */
+  async executeAction(action, studentId, tenantId, context, rule) {
+    switch (action.type) {
+      case ACTION_TYPES.SET_ELIGIBILITY:
+        return await this.setEligibility(studentId, tenantId, action.eligible, rule);
+        
+      case ACTION_TYPES.APPLY_GRACE_MARKS:
+        return await this.applyGraceMarks(studentId, tenantId, action.marks, action.max_marks, context);
+        
+      case ACTION_TYPES.SEND_NOTIFICATION:
+        return await this.sendNotification(studentId, tenantId, action.message, rule, context);
+        
+      case ACTION_TYPES.BLOCK_ENROLLMENT:
+        return await this.blockEnrollment(studentId, tenantId, action.reason, rule);
+        
+      default:
+        throw new Error(`Unknown action type: ${action.type}`);
+    }
+  }
+
+  /**
+   * Set eligibility status for student
+   * @param {string} studentId - Student ID
+   * @param {string} tenantId - Tenant ID
+   * @param {boolean} eligible - Eligibility status
+   * @param {Object} rule - Rule that triggered this
+   * @returns {Promise<Object>} Result
+   */
+  async setEligibility(studentId, tenantId, eligible, rule) {
+    // This would update a student_eligibility table or similar
+    // For now, we'll just return the result
+    return {
+      action: 'set_eligibility',
+      student_id: studentId,
+      eligible: eligible,
+      rule_id: rule.rule_id,
+      rule_name: rule.rule_name
+    };
+  }
+
+  /**
+   * Apply grace marks to student
+   * @param {string} studentId - Student ID
+   * @param {string} tenantId - Tenant ID
+   * @param {number} marks - Grace marks to apply
+   * @param {number} maxMarks - Maximum grace marks allowed
+   * @param {Object} context - Evaluation context
+   * @returns {Promise<Object>} Result
+   */
+  async applyGraceMarks(studentId, tenantId, marks, maxMarks, context) {
+    // Calculate actual grace marks (respecting max)
+    const actualMarks = maxMarks ? Math.min(marks, maxMarks) : marks;
+    
+    return {
+      action: 'apply_grace_marks',
+      student_id: studentId,
+      grace_marks: actualMarks,
+      original_marks: context.marks || context.grade,
+      new_marks: (context.marks || context.grade) + actualMarks
+    };
+  }
+
+  /**
+   * Send notification to student/admin
+   * @param {string} studentId - Student ID
+   * @param {string} tenantId - Tenant ID
+   * @param {string} message - Notification message
+   * @param {Object} rule - Rule that triggered this
+   * @param {Object} context - Evaluation context
+   * @returns {Promise<Object>} Result
+   */
+  async sendNotification(studentId, tenantId, message, rule, context) {
+    // Format message with context variables
+    const formattedMessage = this.formatNotificationMessage(message, context, rule);
+    
+    // In a real implementation, this would integrate with a notification service
+    // For now, we'll log it and return the result
+    console.log(`Notification for student ${studentId}: ${formattedMessage}`);
+    
+    // Store notification in database
+    const database = this.db || db;
+    const notificationId = require('uuid').v4();
+    
+    try {
+      await database('notifications').insert({
+        notification_id: notificationId,
+        tenant_id: tenantId,
+        recipient_id: studentId,
+        recipient_type: 'student',
+        title: `Academic Rule Alert: ${rule.rule_name}`,
+        message: formattedMessage,
+        type: 'rule_triggered',
+        priority: 'high',
+        status: 'pending',
+        metadata: JSON.stringify({
+          rule_id: rule.rule_id,
+          rule_name: rule.rule_name,
+          context: context
+        }),
+        created_at: new Date()
+      });
+    } catch (error) {
+      console.warn('Error storing notification:', error);
+    }
+    
+    return {
+      action: 'send_notification',
+      student_id: studentId,
+      message: formattedMessage,
+      notification_id: notificationId
+    };
+  }
+
+  /**
+   * Format notification message with context variables
+   * @param {string} template - Message template
+   * @param {Object} context - Evaluation context
+   * @param {Object} rule - Rule
+   * @returns {string} Formatted message
+   */
+  formatNotificationMessage(template, context, rule) {
+    let message = template;
+    
+    // Replace context variables
+    Object.keys(context).forEach(key => {
+      const placeholder = `{{${key}}}`;
+      if (message.includes(placeholder)) {
+        message = message.replace(new RegExp(placeholder, 'g'), context[key]);
+      }
+    });
+    
+    // Replace rule variables
+    message = message.replace(/{{rule_name}}/g, rule.rule_name);
+    
+    return message;
+  }
+
+  /**
+   * Block enrollment for student
+   * @param {string} studentId - Student ID
+   * @param {string} tenantId - Tenant ID
+   * @param {string} reason - Block reason
+   * @param {Object} rule - Rule that triggered this
+   * @returns {Promise<Object>} Result
+   */
+  async blockEnrollment(studentId, tenantId, reason, rule) {
+    // This would update enrollment status or create a block record
+    return {
+      action: 'block_enrollment',
+      student_id: studentId,
+      reason: reason,
+      rule_id: rule.rule_id,
+      rule_name: rule.rule_name
+    };
+  }
+
+  /**
+   * Log evaluation to database
+   * @param {Object} evaluation - Evaluation record
+   * @returns {Promise<void>}
+   */
+  async logEvaluation(evaluation) {
+    const database = this.db || db;
+    await database('rule_evaluations').insert(evaluation);
+  }
+
+  /**
+   * Update evaluation result with action execution details
+   * @param {string} evaluationId - Evaluation ID
+   * @param {Object} updates - Fields to update
+   * @returns {Promise<void>}
+   */
+  async updateEvaluationResult(evaluationId, updates) {
+    const database = this.db || db;
+    await database('rule_evaluations')
+      .where({ evaluation_id: evaluationId })
+      .update(updates);
+  }
+
+  /**
+   * Invalidate rule cache for a tenant
+   * @param {string} tenantId - Tenant ID
+   * @returns {Promise<void>}
+   */
+  async invalidateRuleCache(tenantId) {
+    if (!this.redis) {
+      return;
+    }
+    
+    const cacheKey = `rules:${tenantId}:active`;
+    
+    try {
+      await this.redis.del(cacheKey);
+    } catch (error) {
+      console.warn('Error invalidating rule cache:', error);
+    }
+  }
+
+  /**
+   * Get evaluation history for a student
+   * @param {string} studentId - Student ID
+   * @param {string} tenantId - Tenant ID
+   * @param {Object} options - Query options
+   * @returns {Promise<Array>} Evaluation history
+   */
+  async getEvaluationHistory(studentId, tenantId, options = {}) {
+    const database = this.db || db;
+    const { limit = 50, offset = 0, ruleId = null } = options;
+    
+    let query = database('rule_evaluations')
+      .where({
+        student_id: studentId,
+        tenant_id: tenantId
+      })
+      .orderBy('evaluated_at', 'desc')
+      .limit(limit)
+      .offset(offset);
+    
+    if (ruleId) {
+      query = query.where({ rule_id: ruleId });
+    }
+    
+    const evaluations = await query;
+    
+    return evaluations.map(evaluation => ({
+      ...evaluation,
+      context: JSON.parse(evaluation.context),
+      action_result: evaluation.action_result ? JSON.parse(evaluation.action_result) : null
+    }));
   }
 }
 

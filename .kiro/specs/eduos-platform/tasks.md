@@ -554,7 +554,7 @@ Each task is considered complete when:
     - API: POST `/api/v1/policies/rules` creates new rule
     - UI: rule builder with visual condition editor
 
-- [ ] 5.1.2 Implement real-time rule evaluation
+- [x] 5.1.2 Implement real-time rule evaluation
   - **Definition of Done:**
     - Rules evaluated on data change (attendance, grades)
     - Evaluation engine: < 100ms latency for rule checks

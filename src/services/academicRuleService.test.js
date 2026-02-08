@@ -312,3 +312,416 @@ describe('AcademicRuleService - Validation', () => {
     });
   });
 });
+
+
+// ============================================================================
+// REAL-TIME RULE EVALUATION TESTS
+// ============================================================================
+
+describe('AcademicRuleService - Real-Time Evaluation', () => {
+  const mockTenantId = 'tenant-123';
+  const mockStudentId = 'student-456';
+  const mockUserId = 'user-789';
+
+  // Mock database and Redis
+  let mockDb;
+  let mockRedis;
+
+  beforeEach(() => {
+    // Reset mocks
+    const mockQuery = {
+      where: jest.fn().mockReturnThis(),
+      whereNull: jest.fn().mockReturnThis(),
+      orWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      offset: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      first: jest.fn().mockResolvedValue(null),
+      insert: jest.fn().mockResolvedValue([]),
+      update: jest.fn().mockResolvedValue([])
+    };
+
+    // Create a function that returns the query builder
+    mockDb = jest.fn(() => mockQuery);
+    // Add methods directly to the function for backwards compatibility
+    Object.assign(mockDb, mockQuery);
+
+    mockRedis = {
+      get: jest.fn().mockResolvedValue(null),
+      setex: jest.fn().mockResolvedValue('OK'),
+      del: jest.fn().mockResolvedValue(1)
+    };
+
+    // Initialize service with mocks
+    academicRuleService.initialize(mockDb, mockRedis);
+  });
+
+  describe('evaluateRulesForStudent', () => {
+    it('should evaluate attendance threshold rule and trigger action', async () => {
+      const mockRule = {
+        rule_id: 'rule-1',
+        tenant_id: mockTenantId,
+        rule_name: 'Minimum Attendance',
+        rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: JSON.stringify([
+          { field: 'attendance_percentage', operator: '<', value: 75 }
+        ]),
+        actions: JSON.stringify([
+          { type: ACTION_TYPES.SEND_NOTIFICATION, message: 'Your attendance is below 75%' }
+        ]),
+        priority: 100,
+        status: 'active',
+        effective_from: new Date('2024-01-01'),
+        effective_until: null
+      };
+
+      // Mock the query chain for academic_rules
+      const academicRulesQuery = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockResolvedValue([mockRule])
+      };
+      
+      // Mock the query chain for notifications
+      const notificationsQuery = {
+        insert: jest.fn().mockResolvedValue([])
+      };
+
+      // Mock the query chain for rule_evaluations (both insert and update)
+      const evaluationsQuery = {
+        insert: jest.fn().mockResolvedValue([]),
+        where: jest.fn().mockReturnThis(),
+        update: jest.fn().mockResolvedValue([])
+      };
+
+      // Setup mockDb to return different queries based on table name
+      mockDb.mockImplementation((tableName) => {
+        if (tableName === 'academic_rules') {
+          return academicRulesQuery;
+        } else if (tableName === 'notifications') {
+          return notificationsQuery;
+        } else if (tableName === 'rule_evaluations') {
+          return evaluationsQuery;
+        }
+        return academicRulesQuery;
+      });
+
+      const context = {
+        attendance_percentage: 70
+      };
+
+      const evaluations = await academicRuleService.evaluateRulesForStudent(
+        mockStudentId,
+        mockTenantId,
+        context
+      );
+
+      expect(evaluations).toHaveLength(1);
+      expect(evaluations[0].condition_met).toBe(true);
+      expect(evaluations[0].rule_name).toBe('Minimum Attendance');
+    });
+
+    it('should not trigger action when condition is not met', async () => {
+      const mockRule = {
+        rule_id: 'rule-2',
+        tenant_id: mockTenantId,
+        rule_name: 'Minimum Attendance',
+        rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: JSON.stringify([
+          { field: 'attendance_percentage', operator: '<', value: 75 }
+        ]),
+        actions: JSON.stringify([
+          { type: ACTION_TYPES.SEND_NOTIFICATION, message: 'Low attendance alert' }
+        ]),
+        priority: 100,
+        status: 'active',
+        effective_from: new Date('2024-01-01'),
+        effective_until: null
+      };
+
+      const academicRulesQuery = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockResolvedValue([mockRule])
+      };
+
+      mockDb.mockImplementation((tableName) => {
+        if (tableName === 'academic_rules') {
+          return academicRulesQuery;
+        } else if (tableName === 'rule_evaluations') {
+          return { insert: jest.fn().mockResolvedValue([]) };
+        }
+        return academicRulesQuery;
+      });
+
+      const context = {
+        attendance_percentage: 80 // Above threshold
+      };
+
+      const evaluations = await academicRuleService.evaluateRulesForStudent(
+        mockStudentId,
+        mockTenantId,
+        context
+      );
+
+      expect(evaluations).toHaveLength(1);
+      expect(evaluations[0].condition_met).toBe(false);
+      expect(evaluations[0].action_executed).toBe(false);
+    });
+
+    it('should complete evaluation in under 100ms', async () => {
+      const mockRule = {
+        rule_id: 'rule-3',
+        tenant_id: mockTenantId,
+        rule_name: 'Fast Rule',
+        rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: JSON.stringify([
+          { field: 'attendance_percentage', operator: '>=', value: 75 }
+        ]),
+        actions: JSON.stringify([
+          { type: ACTION_TYPES.SET_ELIGIBILITY, eligible: true }
+        ]),
+        priority: 100,
+        status: 'active',
+        effective_from: new Date('2024-01-01'),
+        effective_until: null
+      };
+
+      const academicRulesQuery = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockResolvedValue([mockRule])
+      };
+
+      const evaluationsQuery = {
+        insert: jest.fn().mockResolvedValue([]),
+        where: jest.fn().mockReturnThis(),
+        update: jest.fn().mockResolvedValue([])
+      };
+
+      mockDb.mockImplementation((tableName) => {
+        if (tableName === 'academic_rules') {
+          return academicRulesQuery;
+        } else if (tableName === 'rule_evaluations') {
+          return evaluationsQuery;
+        }
+        return academicRulesQuery;
+      });
+
+      const context = {
+        attendance_percentage: 80
+      };
+
+      const startTime = Date.now();
+      await academicRuleService.evaluateRulesForStudent(
+        mockStudentId,
+        mockTenantId,
+        context
+      );
+      const latency = Date.now() - startTime;
+
+      expect(latency).toBeLessThan(100);
+    });
+  });
+
+  describe('getApplicableRules - Caching', () => {
+    it('should use cached rules when available', async () => {
+      const cachedRules = [
+        {
+          rule_id: 'rule-1',
+          tenant_id: mockTenantId,
+          rule_name: 'Cached Rule',
+          rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+          conditions: [{ field: 'attendance_percentage', operator: '<', value: 75 }],
+          actions: [{ type: ACTION_TYPES.SEND_NOTIFICATION, message: 'Alert' }],
+          priority: 100,
+          status: 'active'
+        }
+      ];
+
+      mockRedis.get.mockResolvedValue(JSON.stringify(cachedRules));
+
+      const context = { attendance_percentage: 70 };
+      const rules = await academicRuleService.getApplicableRules(mockTenantId, context);
+
+      expect(mockRedis.get).toHaveBeenCalledWith(`rules:${mockTenantId}:active`);
+      expect(rules).toHaveLength(1);
+      expect(rules[0].rule_name).toBe('Cached Rule');
+    });
+
+    it('should fetch from database and cache when cache miss', async () => {
+      const dbRules = [
+        {
+          rule_id: 'rule-2',
+          tenant_id: mockTenantId,
+          rule_name: 'DB Rule',
+          rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+          conditions: JSON.stringify([{ field: 'attendance_percentage', operator: '<', value: 75 }]),
+          actions: JSON.stringify([{ type: ACTION_TYPES.SEND_NOTIFICATION, message: 'Alert' }]),
+          priority: 100,
+          status: 'active',
+          effective_from: new Date('2024-01-01'),
+          effective_until: null
+        }
+      ];
+
+      mockRedis.get.mockResolvedValue(null); // Cache miss
+
+      const academicRulesQuery = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockResolvedValue(dbRules)
+      };
+
+      mockDb.mockImplementation(() => academicRulesQuery);
+
+      const context = { attendance_percentage: 70 };
+      const rules = await academicRuleService.getApplicableRules(mockTenantId, context);
+
+      expect(mockRedis.get).toHaveBeenCalled();
+      expect(mockRedis.setex).toHaveBeenCalledWith(
+        `rules:${mockTenantId}:active`,
+        300,
+        expect.any(String)
+      );
+      expect(rules).toHaveLength(1);
+    });
+  });
+
+  describe('checkConditions', () => {
+    it('should evaluate >= operator correctly', () => {
+      const conditions = [
+        { field: 'attendance_percentage', operator: '>=', value: 75 }
+      ];
+      const context = { attendance_percentage: 80 };
+
+      const result = academicRuleService.checkConditions(conditions, context);
+      expect(result).toBe(true);
+    });
+
+    it('should evaluate < operator correctly', () => {
+      const conditions = [
+        { field: 'attendance_percentage', operator: '<', value: 75 }
+      ];
+      const context = { attendance_percentage: 70 };
+
+      const result = academicRuleService.checkConditions(conditions, context);
+      expect(result).toBe(true);
+    });
+
+    it('should evaluate == operator correctly', () => {
+      const conditions = [
+        { field: 'grade', operator: '==', value: 'A' }
+      ];
+      const context = { grade: 'A' };
+
+      const result = academicRuleService.checkConditions(conditions, context);
+      expect(result).toBe(true);
+    });
+
+    it('should evaluate in operator correctly', () => {
+      const conditions = [
+        { field: 'status', operator: 'in', value: ['active', 'pending'] }
+      ];
+      const context = { status: 'active' };
+
+      const result = academicRuleService.checkConditions(conditions, context);
+      expect(result).toBe(true);
+    });
+
+    it('should return false when all conditions are not met', () => {
+      const conditions = [
+        { field: 'attendance_percentage', operator: '>=', value: 75 },
+        { field: 'grade', operator: '>=', value: 60 }
+      ];
+      const context = {
+        attendance_percentage: 80,
+        grade: 50 // Fails second condition
+      };
+
+      const result = academicRuleService.checkConditions(conditions, context);
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('invalidateRuleCache', () => {
+    it('should delete cache key for tenant', async () => {
+      await academicRuleService.invalidateRuleCache(mockTenantId);
+
+      expect(mockRedis.del).toHaveBeenCalledWith(`rules:${mockTenantId}:active`);
+    });
+
+    it('should handle Redis errors gracefully', async () => {
+      mockRedis.del.mockRejectedValue(new Error('Redis error'));
+
+      // Should not throw
+      await expect(
+        academicRuleService.invalidateRuleCache(mockTenantId)
+      ).resolves.not.toThrow();
+    });
+  });
+
+  describe('getEvaluationHistory', () => {
+    it('should retrieve evaluation history for a student', async () => {
+      const mockEvaluations = [
+        {
+          evaluation_id: 'eval-1',
+          rule_id: 'rule-1',
+          tenant_id: mockTenantId,
+          student_id: mockStudentId,
+          context: JSON.stringify({ attendance_percentage: 70 }),
+          condition_met: true,
+          action_executed: true,
+          action_result: JSON.stringify([{ action_type: 'send_notification', success: true }]),
+          evaluated_at: new Date()
+        }
+      ];
+
+      const evaluationsQuery = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockResolvedValue(mockEvaluations)
+      };
+
+      mockDb.mockImplementation(() => evaluationsQuery);
+
+      const history = await academicRuleService.getEvaluationHistory(
+        mockStudentId,
+        mockTenantId,
+        { limit: 50, offset: 0 }
+      );
+
+      expect(history).toHaveLength(1);
+      expect(history[0].evaluation_id).toBe('eval-1');
+      expect(history[0].context).toEqual({ attendance_percentage: 70 });
+    });
+  });
+
+  describe('formatNotificationMessage', () => {
+    it('should replace context variables in message template', () => {
+      const template = 'Your attendance is {{attendance_percentage}}%';
+      const context = { attendance_percentage: 70 };
+      const rule = { rule_name: 'Test Rule' };
+
+      const formatted = academicRuleService.formatNotificationMessage(
+        template,
+        context,
+        rule
+      );
+
+      expect(formatted).toBe('Your attendance is 70%');
+    });
+
+    it('should replace rule variables in message template', () => {
+      const template = 'Rule {{rule_name}} has been triggered';
+      const context = {};
+      const rule = { rule_name: 'Attendance Alert' };
+
+      const formatted = academicRuleService.formatNotificationMessage(
+        template,
+        context,
+        rule
+      );
+
+      expect(formatted).toBe('Rule Attendance Alert has been triggered');
+    });
+  });
+});

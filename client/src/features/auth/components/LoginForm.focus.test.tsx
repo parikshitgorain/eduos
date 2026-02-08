@@ -46,7 +46,7 @@ describe('LoginForm - Focus Management', () => {
     await user.click(emailInput);
 
     // Check that focus ring classes are present
-    expect(emailInput).toHaveClass('focus:ring-2', 'focus:ring-primary-500');
+    expect(emailInput).toHaveClass('focus:ring-2', 'focus:ring-indigo-500');
   });
 
   it('should clear password on authentication error', async () => {
@@ -131,9 +131,9 @@ describe('LoginForm - Focus Management', () => {
     const passwordInput = screen.getByLabelText(/^password$/i);
 
     // All inputs should have focus ring classes
-    expect(tenantInput).toHaveClass('focus:ring-2', 'focus:ring-primary-500');
-    expect(emailInput).toHaveClass('focus:ring-2', 'focus:ring-primary-500');
-    expect(passwordInput).toHaveClass('focus:ring-2', 'focus:ring-primary-500');
+    expect(tenantInput).toHaveClass('focus:ring-2', 'focus:ring-indigo-500');
+    expect(emailInput).toHaveClass('focus:ring-2', 'focus:ring-indigo-500');
+    expect(passwordInput).toHaveClass('focus:ring-2', 'focus:ring-indigo-500');
   });
 
   it('should have proper tab order through form fields', () => {

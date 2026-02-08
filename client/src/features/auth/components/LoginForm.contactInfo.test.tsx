@@ -82,7 +82,7 @@ describe('LoginForm - Contact Information Display Logic', () => {
       );
 
       // Search for and select a tenant
-      const tenantInput = screen.getByPlaceholderText(/search for your institution/i);
+      const tenantInput = screen.getByPlaceholderText(/institution id or name/i);
       fireEvent.change(tenantInput, { target: { value: 'University' } });
 
       // Wait for search results
@@ -139,7 +139,7 @@ describe('LoginForm - Contact Information Display Logic', () => {
       );
 
       // Search for and select a tenant
-      const tenantInput = screen.getByPlaceholderText(/search for your institution/i);
+      const tenantInput = screen.getByPlaceholderText(/institution id or name/i);
       fireEvent.change(tenantInput, { target: { value: 'College' } });
 
       // Wait for search results
@@ -190,7 +190,7 @@ describe('LoginForm - Contact Information Display Logic', () => {
       );
 
       // Search for and select a tenant
-      const tenantInput = screen.getByPlaceholderText(/search for your institution/i);
+      const tenantInput = screen.getByPlaceholderText(/institution id or name/i);
       fireEvent.change(tenantInput, { target: { value: 'Institute' } });
 
       // Wait for search results
@@ -254,7 +254,7 @@ describe('LoginForm - Contact Information Display Logic', () => {
 
       // Select first tenant
       vi.mocked(tenantService.searchTenants).mockResolvedValue(mockTenants1);
-      const tenantInput = screen.getByPlaceholderText(/search for your institution/i);
+      const tenantInput = screen.getByPlaceholderText(/institution id or name/i);
       fireEvent.change(tenantInput, { target: { value: 'First' } });
 
       await waitFor(() => {

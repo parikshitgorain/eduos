@@ -121,7 +121,7 @@ export function TenantSelector({ onChange, error, disabled = false }: TenantSele
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             onFocus={() => query.length >= 2 && setIsOpen(true)}
-            placeholder="Search for your institution..."
+            placeholder="Institution ID or Name"
             disabled={disabled}
             aria-label="Search for institution"
             aria-required="true"
@@ -133,9 +133,9 @@ export function TenantSelector({ onChange, error, disabled = false }: TenantSele
             aria-activedescendant={selectedIndex >= 0 ? `tenant-option-${selectedIndex}` : undefined}
             role="combobox"
             className={`
-              w-full h-12 pl-10 pr-10 rounded-lg border bg-white
+              w-full px-3 py-3 pl-10 pr-10 rounded-md border bg-white text-sm
               ${error ? 'border-red-500' : 'border-gray-300'}
-              focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
+              focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
               disabled:bg-gray-100 disabled:cursor-not-allowed
               text-gray-900 placeholder-gray-400
             `}

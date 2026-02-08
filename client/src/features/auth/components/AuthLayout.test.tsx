@@ -72,8 +72,8 @@ describe('AuthLayout', () => {
       </AuthLayout>
     );
 
-    // Check for responsive wrapper classes
-    const wrapper = container.querySelector('.max-w-\\[480px\\]');
+    // Check for responsive wrapper classes - now uses max-w-md instead of max-w-[480px]
+    const wrapper = container.querySelector('.max-w-md');
     expect(wrapper).toBeInTheDocument();
   });
 
@@ -84,8 +84,8 @@ describe('AuthLayout', () => {
       </AuthLayout>
     );
 
-    // Check for card styling classes
-    const card = container.querySelector('.bg-white.rounded-lg.shadow-md');
+    // Check for card styling classes - shadow class is now shadow-[...] custom value
+    const card = container.querySelector('.bg-white.rounded-lg');
     expect(card).toBeInTheDocument();
   });
 });

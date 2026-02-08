@@ -229,7 +229,16 @@ eduos-platform/
 | [AI Kill Switch](AI_KILL_SWITCH.md) | AI Kill Switch mechanism | All |
 | [Duplicate Detection API](DUPLICATE_DETECTION_API.md) | Fuzzy matching API reference | Developers |
 
-### 8. Audit & Compliance Documentation
+### 10. Academic Rules & Policy Management
+
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [Academic Rule Engine](ACADEMIC_RULE_ENGINE.md) | Rule configuration and policy management | All |
+| [Real-Time Rule Evaluation Integration](REAL_TIME_RULE_EVALUATION_INTEGRATION.md) | Integration guide for rule evaluation | Developers |
+| [Task 5.1.1](tasks/TASK_5.1.1_IMPLEMENTATION_SUMMARY.md) | Rule configuration engine implementation | Developers |
+| [Task 5.1.2](tasks/TASK_5.1.2_IMPLEMENTATION_SUMMARY.md) | Real-time rule evaluation implementation | Developers |
+
+### 11. Audit & Compliance Documentation
 
 | Document | Description | Audience |
 |----------|-------------|----------|
@@ -241,7 +250,7 @@ eduos-platform/
 | [Task 4.2.2](tasks/TASK_4.2.2_IMPLEMENTATION_SUMMARY.md) | Comprehensive event logging | Developers |
 | [Task 4.2.3](tasks/TASK_4.2.3_IMPLEMENTATION_SUMMARY.md) | Audit dashboard and reporting | Developers |
 
-### 9. Security & Rate Limiting Documentation
+### 12. Security & Rate Limiting Documentation
 
 | Document | Description | Audience |
 |----------|-------------|----------|
@@ -285,7 +294,7 @@ eduos-platform/
 | [reset-postgres-password.ps1](../scripts/reset-postgres-password.ps1) | Reset PostgreSQL password | Run as Administrator |
 | [reset-postgres-password.sql](../scripts/reset-postgres-password.sql) | SQL for password reset | Use with psql |
 
-### 10. Documentation & Training
+### 13. Documentation & Training
 
 | Document | Description | Audience |
 |----------|-------------|----------|
@@ -297,7 +306,7 @@ eduos-platform/
 | [Video Tutorial Scripts](VIDEO_TUTORIAL_SCRIPTS.md) | Video tutorial scripts (5-10 min each) | All |
 | [Task 4.4.5](tasks/TASK_4.4.5_IMPLEMENTATION_SUMMARY.md) | Documentation implementation summary | Developers |
 
-### 11. Utility Scripts
+### 14. Utility Scripts
 
 | Document | Description | Audience |
 |----------|-------------|----------|
@@ -353,6 +362,9 @@ eduos-platform/
 
 **...train security team**
 → [Security Training Program](SECURITY_TRAINING_PROGRAM.md) → Quarterly drill scenarios
+
+**...configure academic rules**
+→ [Academic Rule Engine](ACADEMIC_RULE_ENGINE.md) → [Real-Time Rule Evaluation Integration](REAL_TIME_RULE_EVALUATION_INTEGRATION.md)
 
 **...check project status**
 → [Project Status](PROJECT_STATUS.md)

@@ -227,4 +227,103 @@ router.post('/rules/validate', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/v1/policies/rules/evaluate
+ * Evaluate rules for a student based on current context
+ * 
+ * Request Body:
+ * {
+ *   "student_id": "uuid",
+ *   "context": {
+ *     "attendance_percentage": 72.5,
+ *     "grade": 65,
+ *     "marks": 65
+ *   }
+ * }
+ */
+router.post('/rules/evaluate', async (req, res) => {
+  try {
+    const { tenant_id } = req.user || req.body;
+    const { student_id, context } = req.body;
+
+    if (!student_id || !context) {
+      return res.status(400).json({
+        success: false,
+        message: 'student_id and context are required'
+      });
+    }
+
+    // Initialize service with Redis if available
+    if (req.redis) {
+      academicRuleService.initialize(req.db, req.redis);
+    }
+
+    const evaluations = await academicRuleService.evaluateRulesForStudent(
+      student_id,
+      tenant_id,
+      context
+    );
+
+    res.json({
+      success: true,
+      data: {
+        student_id,
+        evaluations,
+        count: evaluations.length
+      }
+    });
+  } catch (error) {
+    console.error('Error evaluating rules:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to evaluate rules',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/v1/policies/rules/evaluations/:studentId
+ * Get evaluation history for a student
+ * 
+ * Query Parameters:
+ * - limit: Maximum number of evaluations to return (default: 50)
+ * - offset: Offset for pagination (default: 0)
+ * - ruleId: Filter by specific rule ID (optional)
+ */
+router.get('/rules/evaluations/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { tenant_id } = req.user || req.query;
+
+    const options = {
+      limit: parseInt(req.query.limit) || 50,
+      offset: parseInt(req.query.offset) || 0,
+      ruleId: req.query.ruleId || null
+    };
+
+    const evaluations = await academicRuleService.getEvaluationHistory(
+      studentId,
+      tenant_id,
+      options
+    );
+
+    res.json({
+      success: true,
+      data: {
+        student_id: studentId,
+        evaluations,
+        count: evaluations.length
+      }
+    });
+  } catch (error) {
+    console.error('Error getting evaluation history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get evaluation history',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

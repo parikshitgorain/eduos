@@ -31,17 +31,7 @@ export function SSOButtons({
   const isDisabled = disabled || isLoading || !tenantId;
 
   return (
-    <div className="space-y-3">
-      {/* Divider */}
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-300"></div>
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-2 bg-white text-gray-500">Or continue with</span>
-        </div>
-      </div>
-
+    <div className="space-y-6 mt-6">
       {/* Google SSO Button */}
       <button
         type="button"
@@ -50,14 +40,13 @@ export function SSOButtons({
         aria-label="Sign in with Google"
         aria-disabled={isDisabled}
         className={`
-          w-full h-12 px-4 rounded-lg border border-gray-300
-          flex items-center justify-center gap-3
-          font-medium text-gray-700
-          transition-colors duration-200
+          w-full flex items-center justify-center px-4 py-3 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white
+          transition-colors
+          gap-3
           ${
             isDisabled
-              ? 'bg-gray-100 cursor-not-allowed opacity-60'
-              : 'bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
+              ? 'opacity-60 cursor-not-allowed'
+              : 'hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
           }
         `}
       >
@@ -90,14 +79,13 @@ export function SSOButtons({
         aria-label="Sign in with Microsoft"
         aria-disabled={isDisabled}
         className={`
-          w-full h-12 px-4 rounded-lg border border-gray-300
-          flex items-center justify-center gap-3
-          font-medium text-gray-700
-          transition-colors duration-200
+          w-full flex items-center justify-center px-4 py-3 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white
+          transition-colors
+          gap-3
           ${
             isDisabled
-              ? 'bg-gray-100 cursor-not-allowed opacity-60'
-              : 'bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
+              ? 'opacity-60 cursor-not-allowed'
+              : 'hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
           }
         `}
       >

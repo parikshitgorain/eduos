@@ -27,7 +27,7 @@ describe('TenantSelector', () => {
       />
     );
 
-    expect(screen.getByPlaceholderText(/search for your institution/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/institution id or name/i)).toBeInTheDocument();
   });
 
   it('displays error message when provided', () => {

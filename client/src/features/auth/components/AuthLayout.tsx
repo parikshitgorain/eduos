@@ -11,7 +11,7 @@ export interface AuthLayoutProps {
 
 /**
  * AuthLayout Component
- * Responsive layout wrapper for authentication pages
+ * Responsive layout wrapper for authentication pages with header and footer
  * 
  * Responsive breakpoints:
  * - Desktop (1920px+): 480px centered card
@@ -20,45 +20,55 @@ export interface AuthLayoutProps {
  */
 export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
-      <div className="w-full max-w-[480px] mx-auto md:w-[90%] md:max-w-[480px] lg:w-full lg:max-w-[480px]">
-        {/* Card */}
-        <div className="bg-white rounded-lg shadow-md p-8 md:p-12">
-          {/* Logo */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-primary-600">EduOS</h1>
-          </div>
+    <div className="min-h-screen flex flex-col justify-between text-slate-800 bg-gray-50">
+      {/* Header */}
+      <header className="w-full bg-white px-8 py-4 border-b border-gray-100 flex items-center px-10 py-5">
+        <div className="text-2xl font-extrabold tracking-tight text-slate-900">
+          EduOS
+        </div>
+      </header>
 
-          {/* Heading */}
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
-            {subtitle && <p className="mt-2 text-sm text-gray-600">{subtitle}</p>}
-          </div>
+      {/* Main Content */}
+      <main className="flex-grow flex items-center justify-center p-4">
+        {/* Login Card Container */}
+        <div className="bg-white p-8 rounded-lg shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-2px_rgba(0,0,0,0.05)] w-full border border-gray-200 max-w-md">
+          {/* Card Title */}
+          <h1 className="text-2xl text-center mb-8 text-slate-900 font-extrabold">
+            {title}
+          </h1>
+
+          {/* Subtitle (if provided) */}
+          {subtitle && (
+            <div className="text-center mb-6">
+              <p className="text-sm text-gray-600">{subtitle}</p>
+            </div>
+          )}
 
           {/* Content */}
           {children}
         </div>
+      </main>
 
-        {/* Footer */}
-        <div className="mt-8 text-center text-sm text-gray-600">
-          <div className="space-x-4">
-            <a 
-              href="/terms" 
-              className="text-primary-600 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded"
-            >
-              Terms of Service
-            </a>
-            <span>•</span>
-            <a 
-              href="/privacy" 
-              className="text-primary-600 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded"
-            >
-              Privacy Policy
-            </a>
-          </div>
-          <p className="mt-2">© {new Date().getFullYear()} EduOS. All rights reserved.</p>
+      {/* Footer */}
+      <footer className="w-full py-6 text-center text-xs text-slate-500 bg-slate-50">
+        <div className="flex justify-center gap-6 mb-2">
+          <a 
+            href="/terms" 
+            className="text-sm text-gray-500 hover:underline"
+          >
+            Terms of Service
+          </a>
+          <a 
+            href="/privacy" 
+            className="text-sm text-gray-500 hover:underline"
+          >
+            Privacy Policy
+          </a>
         </div>
-      </div>
+        <div className="text-xs text-gray-400 mt-2">
+          © {new Date().getFullYear()} EduOS. All rights reserved.
+        </div>
+      </footer>
     </div>
   );
 }

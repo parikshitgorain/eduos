@@ -130,7 +130,7 @@ export function LoginForm({
   return (
     <form 
       onSubmit={handleSubmit(handleFormSubmit)} 
-      className="space-y-6" 
+      className="space-y-4" 
       noValidate
       aria-label="Login form"
     >
@@ -143,7 +143,7 @@ export function LoginForm({
 
       {/* Institution Selection */}
       <div>
-        <label htmlFor="tenant" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="tenant" className="sr-only">
           Institution
         </label>
         <TenantSelector
@@ -156,7 +156,7 @@ export function LoginForm({
 
       {/* Email Input */}
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="email" className="sr-only">
           Email
         </label>
         <input
@@ -165,17 +165,17 @@ export function LoginForm({
           id="email"
           autoComplete="email"
           disabled={isLoading || !tenantId}
-          placeholder="your.email@example.com"
+          placeholder="Email"
           aria-label="Email address"
           aria-required="true"
           aria-invalid={!!errors.email}
           aria-describedby={errors.email ? 'email-error' : undefined}
           className={`
-            w-full h-12 px-4 rounded-lg border bg-white
+            w-full px-3 py-3 rounded-md border bg-white text-sm
             ${errors.email ? 'border-red-500' : 'border-gray-300'}
-            focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
+            focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
             disabled:bg-gray-100 disabled:cursor-not-allowed
-            text-gray-900 placeholder-gray-500
+            text-gray-900 placeholder-gray-400
           `}
         />
         {errors.email && (
@@ -187,39 +187,41 @@ export function LoginForm({
 
       {/* Password Input */}
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-            Password
-          </label>
-          <Link
-            to="/forgot-password"
-            className="text-sm text-primary-600 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded px-2 py-2 min-h-[44px] inline-flex items-center"
-          >
-            Forgot password?
-          </Link>
-        </div>
+        <label htmlFor="password" className="sr-only">
+          Password
+        </label>
         <PasswordInput
           value={password}
           onChange={handlePasswordChange}
           error={errors.password?.message}
           disabled={isLoading || !tenantId}
-          placeholder="Enter your password"
+          placeholder="Password"
         />
       </div>
 
-      {/* Remember Me Checkbox */}
-      <div className="flex items-center">
-        <input
-          {...register('rememberMe')}
-          type="checkbox"
-          id="rememberMe"
-          disabled={isLoading}
-          aria-label="Remember me for 30 days"
-          className="w-5 h-5 accent-primary-600 bg-white border-gray-300 rounded focus:ring-primary-500 focus:ring-2 cursor-pointer disabled:cursor-not-allowed"
-        />
-        <label htmlFor="rememberMe" className="ml-2 text-sm text-gray-700 cursor-pointer select-none">
-          Remember me
-        </label>
+      {/* Remember Me and Forgot Password Row */}
+      <div className="flex items-center justify-between mt-2">
+        <div className="flex items-center">
+          <input
+            {...register('rememberMe')}
+            type="checkbox"
+            id="rememberMe"
+            disabled={isLoading}
+            aria-label="Remember me for 30 days"
+            className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer disabled:cursor-not-allowed"
+          />
+          <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-900 font-medium cursor-pointer select-none">
+            Remember me
+          </label>
+        </div>
+        <div className="text-sm">
+          <Link
+            to="/forgot-password"
+            className="font-medium text-gray-600 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded"
+          >
+            Forgot password?
+          </Link>
+        </div>
       </div>
 
       {/* CAPTCHA Widget (shown after 3 failed attempts) */}
@@ -237,13 +239,12 @@ export function LoginForm({
         aria-label={isLoading ? 'Signing in, please wait' : 'Sign in to your account'}
         aria-disabled={!isValid || isLoading || (showCaptcha && !watch('captchaToken'))}
         className={`
-          w-full h-12 rounded-lg font-medium text-white
-          flex items-center justify-center gap-2
-          transition-colors duration-200
+          w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white
+          transition-colors
           ${
             !isValid || isLoading || (showCaptcha && !watch('captchaToken'))
-              ? 'bg-gray-500 cursor-not-allowed'
-              : 'bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
+              ? 'bg-gray-400 cursor-not-allowed'
+              : 'bg-[#4F46E5] hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4F46E5]'
           }
         `}
       >

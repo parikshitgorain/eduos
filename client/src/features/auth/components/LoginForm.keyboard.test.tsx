@@ -64,9 +64,9 @@ describe('LoginForm - Keyboard Navigation', () => {
       );
 
       // Get all interactive elements
-      const tenantInput = screen.getByPlaceholderText(/search for your institution/i);
+      const tenantInput = screen.getByPlaceholderText(/institution id or name/i);
       const emailInput = screen.getByLabelText(/email/i);
-      const passwordInput = screen.getByLabelText(/enter your password/i);
+      const passwordInput = screen.getByPlaceholderText(/^password$/i);
       const forgotPasswordLink = screen.getByText(/forgot password/i);
       const rememberMeCheckbox = screen.getByLabelText(/remember me/i);
 

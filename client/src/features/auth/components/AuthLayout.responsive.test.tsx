@@ -44,13 +44,13 @@ describe('AuthLayout - Responsive Breakpoints', () => {
       </AuthLayout>
     );
 
-    // Find the card container
+    // Find the card container - now uses max-w-md (448px, close to 480px)
     const card = container.querySelector('[class*="max-w-"]');
     expect(card).toBeInTheDocument();
 
-    // Check that it has max-width constraint (480px = max-w-[480px])
+    // Check that it has max-width constraint
     const classes = card?.className || '';
-    expect(classes).toMatch(/max-w-\[480px\]/);
+    expect(classes).toMatch(/max-w-md/);
   });
 
   /**
@@ -70,7 +70,7 @@ describe('AuthLayout - Responsive Breakpoints', () => {
     expect(card).toBeInTheDocument();
 
     const classes = card?.className || '';
-    expect(classes).toMatch(/max-w-\[480px\]/);
+    expect(classes).toMatch(/max-w-md/);
   });
 
   /**
@@ -127,11 +127,11 @@ describe('AuthLayout - Responsive Breakpoints', () => {
       </AuthLayout>
     );
 
-    // Check outer container has padding
-    const outerContainer = container.querySelector('.min-h-screen');
-    expect(outerContainer).toBeInTheDocument();
-    const outerClasses = outerContainer?.className || '';
-    expect(outerClasses).toMatch(/px-4/); // 16px horizontal padding
+    // Check main container has padding (p-4 = 16px)
+    const mainContainer = container.querySelector('main');
+    expect(mainContainer).toBeInTheDocument();
+    const mainClasses = mainContainer?.className || '';
+    expect(mainClasses).toMatch(/p-4/); // 16px padding
 
     // Check card container has full width
     const card = container.querySelector('[class*="max-w-"]');
@@ -153,9 +153,9 @@ describe('AuthLayout - Responsive Breakpoints', () => {
       </AuthLayout>
     );
 
-    const outerContainer = container.querySelector('.min-h-screen');
-    const outerClasses = outerContainer?.className || '';
-    expect(outerClasses).toMatch(/px-4/);
+    const mainContainer = container.querySelector('main');
+    const mainClasses = mainContainer?.className || '';
+    expect(mainClasses).toMatch(/p-4/);
 
     const card = container.querySelector('[class*="max-w-"]');
     const classes = card?.className || '';
@@ -175,9 +175,9 @@ describe('AuthLayout - Responsive Breakpoints', () => {
       </AuthLayout>
     );
 
-    const outerContainer = container.querySelector('.min-h-screen');
-    const outerClasses = outerContainer?.className || '';
-    expect(outerClasses).toMatch(/px-4/);
+    const mainContainer = container.querySelector('main');
+    const mainClasses = mainContainer?.className || '';
+    expect(mainClasses).toMatch(/p-4/);
 
     const card = container.querySelector('[class*="max-w-"]');
     const classes = card?.className || '';
@@ -203,9 +203,10 @@ describe('AuthLayout - Responsive Breakpoints', () => {
       const card = container.querySelector('[class*="max-w-"]');
       expect(card).toBeInTheDocument();
 
-      // Should have centering classes
-      const classes = card?.className || '';
-      expect(classes).toMatch(/mx-auto/); // Horizontal centering
+      // Card is centered via flex layout in main container
+      const mainContainer = container.querySelector('main');
+      const mainClasses = mainContainer?.className || '';
+      expect(mainClasses).toMatch(/justify-center/); // Horizontal centering via flex
     });
   });
 
@@ -215,9 +216,9 @@ describe('AuthLayout - Responsive Breakpoints', () => {
    */
   it('should have appropriate padding at all breakpoints', () => {
     const breakpoints = [
-      { width: 320, expectedPadding: 'px-4' },
-      { width: 768, expectedPadding: 'px-4' },
-      { width: 1920, expectedPadding: 'px-4' },
+      { width: 320, expectedPadding: 'p-4' },
+      { width: 768, expectedPadding: 'p-4' },
+      { width: 1920, expectedPadding: 'p-4' },
     ];
 
     breakpoints.forEach(({ width, expectedPadding }) => {
@@ -229,8 +230,8 @@ describe('AuthLayout - Responsive Breakpoints', () => {
         </AuthLayout>
       );
 
-      const outerContainer = container.querySelector('.min-h-screen');
-      const classes = outerContainer?.className || '';
+      const mainContainer = container.querySelector('main');
+      const classes = mainContainer?.className || '';
       expect(classes).toMatch(new RegExp(expectedPadding));
     });
   });
@@ -251,8 +252,9 @@ describe('AuthLayout - Responsive Breakpoints', () => {
         </AuthLayout>
       );
 
-      // Check the inner card div (not the container)
-      const innerCard = container.querySelector('.bg-white');
+      // Check the card div inside main (not the header)
+      const mainContainer = container.querySelector('main');
+      const innerCard = mainContainer?.querySelector('.bg-white');
       expect(innerCard).toBeInTheDocument();
       const classes = innerCard?.className || '';
 
