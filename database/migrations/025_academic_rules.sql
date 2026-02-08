@@ -95,19 +95,24 @@ CREATE TABLE IF NOT EXISTS rule_overrides (
     tenant_id UUID NOT NULL,
     student_id UUID NOT NULL,
     reason TEXT NOT NULL,
+    supporting_documents JSONB, -- Array of document URLs/metadata
     requested_by UUID NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending_approval', -- 'pending_approval', 'approved', 'rejected'
+    status VARCHAR(20) NOT NULL DEFAULT 'pending', -- 'pending', 'approved', 'rejected'
+    approval_chain JSONB NOT NULL, -- Array of roles: ['teacher', 'admin', 'dean']
+    current_approval_level INTEGER NOT NULL DEFAULT 0,
+    approvals JSONB NOT NULL DEFAULT '[]', -- Array of approval records
     approved_by UUID,
     approval_reason TEXT,
     approved_at TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     
     -- Constraints
     CONSTRAINT fk_rule_overrides_rule FOREIGN KEY (rule_id) 
         REFERENCES academic_rules(rule_id) ON DELETE CASCADE,
     CONSTRAINT fk_rule_overrides_tenant FOREIGN KEY (tenant_id) 
         REFERENCES tenants(tenant_id) ON DELETE CASCADE,
-    CONSTRAINT chk_override_status CHECK (status IN ('pending_approval', 'approved', 'rejected'))
+    CONSTRAINT chk_override_status CHECK (status IN ('pending', 'approved', 'rejected'))
 );
 
 -- Indexes
@@ -120,6 +125,39 @@ CREATE INDEX idx_rule_overrides_status ON rule_overrides(status);
 ALTER TABLE rule_overrides ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY rule_overrides_tenant_isolation ON rule_overrides
+    FOR ALL
+    USING (tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID);
+
+-- ============================================================================
+-- RULE OVERRIDE AUDIT TABLE
+-- ============================================================================
+-- Tracks all actions taken on override requests for audit trail
+
+CREATE TABLE IF NOT EXISTS rule_override_audit (
+    audit_id UUID PRIMARY KEY,
+    override_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
+    action VARCHAR(50) NOT NULL, -- 'created', 'approved_level', 'rejected', 'cancelled'
+    actor_id UUID NOT NULL,
+    details JSONB, -- Additional context about the action
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    
+    -- Constraints
+    CONSTRAINT fk_override_audit_override FOREIGN KEY (override_id) 
+        REFERENCES rule_overrides(override_id) ON DELETE CASCADE,
+    CONSTRAINT fk_override_audit_tenant FOREIGN KEY (tenant_id) 
+        REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+-- Indexes
+CREATE INDEX idx_override_audit_override ON rule_override_audit(override_id);
+CREATE INDEX idx_override_audit_tenant ON rule_override_audit(tenant_id);
+CREATE INDEX idx_override_audit_date ON rule_override_audit(created_at DESC);
+
+-- RLS
+ALTER TABLE rule_override_audit ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY override_audit_tenant_isolation ON rule_override_audit
     FOR ALL
     USING (tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID);
 
@@ -180,13 +218,20 @@ CREATE TRIGGER trigger_update_academic_rules_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_academic_rules_updated_at();
 
+-- Trigger for rule_overrides
+CREATE TRIGGER trigger_update_rule_overrides_updated_at
+    BEFORE UPDATE ON rule_overrides
+    FOR EACH ROW
+    EXECUTE FUNCTION update_academic_rules_updated_at();
+
 -- ============================================================================
 -- COMMENTS
 -- ============================================================================
 
 COMMENT ON TABLE academic_rules IS 'Stores academic policy rules for automated enforcement';
 COMMENT ON TABLE rule_evaluations IS 'Audit log of all rule evaluations';
-COMMENT ON TABLE rule_overrides IS 'Manual overrides of rule decisions with approval workflow';
+COMMENT ON TABLE rule_overrides IS 'Manual overrides of rule decisions with configurable approval workflow';
+COMMENT ON TABLE rule_override_audit IS 'Audit trail of all actions taken on override requests';
 COMMENT ON TABLE retroactive_policy_requests IS 'Requests to apply policy changes retroactively';
 
 COMMENT ON COLUMN academic_rules.conditions IS 'Array of condition objects: [{field, operator, value}]';
@@ -194,3 +239,8 @@ COMMENT ON COLUMN academic_rules.actions IS 'Array of action objects: [{type, pa
 COMMENT ON COLUMN academic_rules.priority IS 'Higher priority rules evaluated first (default: 100)';
 COMMENT ON COLUMN academic_rules.effective_from IS 'Rule becomes active from this date';
 COMMENT ON COLUMN academic_rules.effective_until IS 'Rule expires after this date (NULL = no expiry)';
+
+COMMENT ON COLUMN rule_overrides.approval_chain IS 'Array of roles defining approval sequence: ["teacher", "admin", "dean"]';
+COMMENT ON COLUMN rule_overrides.current_approval_level IS 'Current position in approval chain (0-indexed)';
+COMMENT ON COLUMN rule_overrides.approvals IS 'Array of approval records with timestamps and reasons';
+COMMENT ON COLUMN rule_overrides.supporting_documents IS 'Array of document metadata supporting the override request';

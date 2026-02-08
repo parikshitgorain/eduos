@@ -725,3 +725,920 @@ describe('AcademicRuleService - Real-Time Evaluation', () => {
     });
   });
 });
+
+
+describe('AcademicRuleService - Additional Coverage', () => {
+  const mockTenantId = 'tenant-123';
+  const mockStudentId = 'student-456';
+  const mockUserId = 'user-789';
+
+  let mockDb;
+  let mockRedis;
+
+  beforeEach(() => {
+    const mockQuery = {
+      where: jest.fn().mockReturnThis(),
+      whereNull: jest.fn().mockReturnThis(),
+      whereNot: jest.fn().mockReturnThis(),
+      orWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      offset: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      first: jest.fn().mockResolvedValue(null),
+      insert: jest.fn().mockResolvedValue([]),
+      update: jest.fn().mockResolvedValue([])
+    };
+
+    mockDb = jest.fn(() => mockQuery);
+    Object.assign(mockDb, mockQuery);
+
+    mockRedis = {
+      get: jest.fn().mockResolvedValue(null),
+      setex: jest.fn().mockResolvedValue('OK'),
+      del: jest.fn().mockResolvedValue(1)
+    };
+
+    academicRuleService.initialize(mockDb, mockRedis);
+  });
+
+  describe('evaluateCondition - All operators', () => {
+    it('should evaluate != operator', () => {
+      const condition = { field: 'status', operator: '!=', value: 'inactive' };
+      const context = { status: 'active' };
+      
+      const result = academicRuleService.evaluateCondition(condition, context);
+      expect(result).toBe(true);
+    });
+
+    it('should evaluate not_in operator', () => {
+      const condition = { field: 'grade', operator: 'not_in', value: ['F', 'D'] };
+      const context = { grade: 'A' };
+      
+      const result = academicRuleService.evaluateCondition(condition, context);
+      expect(result).toBe(true);
+    });
+
+    it('should return false for unknown operator', () => {
+      const condition = { field: 'test', operator: 'unknown', value: 10 };
+      const context = { test: 10 };
+      
+      const result = academicRuleService.evaluateCondition(condition, context);
+      expect(result).toBe(false);
+    });
+
+    it('should return false when context value is undefined', () => {
+      const condition = { field: 'missing_field', operator: '==', value: 10 };
+      const context = { other_field: 10 };
+      
+      const result = academicRuleService.evaluateCondition(condition, context);
+      expect(result).toBe(false);
+    });
+
+    it('should evaluate > operator', () => {
+      const condition = { field: 'score', operator: '>', value: 50 };
+      const context = { score: 60 };
+      
+      const result = academicRuleService.evaluateCondition(condition, context);
+      expect(result).toBe(true);
+    });
+
+    it('should evaluate <= operator', () => {
+      const condition = { field: 'score', operator: '<=', value: 50 };
+      const context = { score: 40 };
+      
+      const result = academicRuleService.evaluateCondition(condition, context);
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('filterRulesByContext', () => {
+    it('should filter rules for attendance context', () => {
+      const rules = [
+        { rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD, rule_id: 'rule-1' },
+        { rule_type: RULE_TYPES.GRADE_ELIGIBILITY, rule_id: 'rule-2' }
+      ];
+      const context = { attendance_percentage: 75 };
+
+      const filtered = academicRuleService.filterRulesByContext(rules, context);
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].rule_id).toBe('rule-1');
+    });
+
+    it('should filter rules for grade context', () => {
+      const rules = [
+        { rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD, rule_id: 'rule-1' },
+        { rule_type: RULE_TYPES.GRADE_ELIGIBILITY, rule_id: 'rule-2' },
+        { rule_type: RULE_TYPES.GRACE_MARKS, rule_id: 'rule-3' }
+      ];
+      const context = { grade: 65 };
+
+      const filtered = academicRuleService.filterRulesByContext(rules, context);
+      expect(filtered).toHaveLength(2);
+    });
+
+    it('should filter rules for marks context', () => {
+      const rules = [
+        { rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD, rule_id: 'rule-1' },
+        { rule_type: RULE_TYPES.GRACE_MARKS, rule_id: 'rule-2' }
+      ];
+      const context = { marks: 55 };
+
+      const filtered = academicRuleService.filterRulesByContext(rules, context);
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].rule_id).toBe('rule-2');
+    });
+  });
+
+  describe('executeAction - All action types', () => {
+    it('should execute SET_ELIGIBILITY action', async () => {
+      const action = { type: ACTION_TYPES.SET_ELIGIBILITY, eligible: false };
+      const rule = { rule_id: 'rule-1', rule_name: 'Test Rule' };
+      const context = {};
+
+      const result = await academicRuleService.executeAction(
+        action,
+        mockStudentId,
+        mockTenantId,
+        context,
+        rule
+      );
+
+      expect(result.action).toBe('set_eligibility');
+      expect(result.eligible).toBe(false);
+    });
+
+    it('should execute APPLY_GRACE_MARKS action with max_marks', async () => {
+      const action = { type: ACTION_TYPES.APPLY_GRACE_MARKS, marks: 10, max_marks: 5 };
+      const rule = { rule_id: 'rule-1', rule_name: 'Grace Marks Rule' };
+      const context = { marks: 35 };
+
+      const result = await academicRuleService.executeAction(
+        action,
+        mockStudentId,
+        mockTenantId,
+        context,
+        rule
+      );
+
+      expect(result.action).toBe('apply_grace_marks');
+      expect(result.grace_marks).toBe(5); // Capped at max_marks
+      expect(result.new_marks).toBe(40);
+    });
+
+    it('should execute APPLY_GRACE_MARKS action without max_marks', async () => {
+      const action = { type: ACTION_TYPES.APPLY_GRACE_MARKS, marks: 5 };
+      const rule = { rule_id: 'rule-1', rule_name: 'Grace Marks Rule' };
+      const context = { grade: 60 };
+
+      const result = await academicRuleService.executeAction(
+        action,
+        mockStudentId,
+        mockTenantId,
+        context,
+        rule
+      );
+
+      expect(result.action).toBe('apply_grace_marks');
+      expect(result.grace_marks).toBe(5);
+      expect(result.new_marks).toBe(65);
+    });
+
+    it('should execute SEND_NOTIFICATION action', async () => {
+      const action = { type: ACTION_TYPES.SEND_NOTIFICATION, message: 'Alert: {{attendance_percentage}}%' };
+      const rule = { rule_id: 'rule-1', rule_name: 'Notification Rule' };
+      const context = { attendance_percentage: 70 };
+
+      const notificationsQuery = {
+        insert: jest.fn().mockResolvedValue([])
+      };
+
+      mockDb.mockImplementation((tableName) => {
+        if (tableName === 'notifications') {
+          return notificationsQuery;
+        }
+        return mockDb;
+      });
+
+      const result = await academicRuleService.executeAction(
+        action,
+        mockStudentId,
+        mockTenantId,
+        context,
+        rule
+      );
+
+      expect(result.action).toBe('send_notification');
+      expect(result.message).toContain('70%');
+      expect(notificationsQuery.insert).toHaveBeenCalled();
+    });
+
+    it('should handle notification insert errors gracefully', async () => {
+      const action = { type: ACTION_TYPES.SEND_NOTIFICATION, message: 'Test' };
+      const rule = { rule_id: 'rule-1', rule_name: 'Test Rule' };
+      const context = {};
+
+      const notificationsQuery = {
+        insert: jest.fn().mockRejectedValue(new Error('DB error'))
+      };
+
+      mockDb.mockImplementation((tableName) => {
+        if (tableName === 'notifications') {
+          return notificationsQuery;
+        }
+        return mockDb;
+      });
+
+      const result = await academicRuleService.executeAction(
+        action,
+        mockStudentId,
+        mockTenantId,
+        context,
+        rule
+      );
+
+      expect(result.action).toBe('send_notification');
+    });
+
+    it('should execute BLOCK_ENROLLMENT action', async () => {
+      const action = { type: ACTION_TYPES.BLOCK_ENROLLMENT, reason: 'Low attendance' };
+      const rule = { rule_id: 'rule-1', rule_name: 'Block Rule' };
+      const context = {};
+
+      const result = await academicRuleService.executeAction(
+        action,
+        mockStudentId,
+        mockTenantId,
+        context,
+        rule
+      );
+
+      expect(result.action).toBe('block_enrollment');
+      expect(result.reason).toBe('Low attendance');
+    });
+
+    it('should throw error for unknown action type', async () => {
+      const action = { type: 'unknown_action' };
+      const rule = { rule_id: 'rule-1', rule_name: 'Test Rule' };
+      const context = {};
+
+      await expect(
+        academicRuleService.executeAction(action, mockStudentId, mockTenantId, context, rule)
+      ).rejects.toThrow('Unknown action type');
+    });
+  });
+
+  describe('getApplicableRules - Redis error handling', () => {
+    it('should handle Redis read errors gracefully', async () => {
+      mockRedis.get.mockRejectedValue(new Error('Redis connection error'));
+
+      const dbRules = [
+        {
+          rule_id: 'rule-1',
+          tenant_id: mockTenantId,
+          rule_name: 'Test Rule',
+          rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+          conditions: JSON.stringify([{ field: 'attendance_percentage', operator: '<', value: 75 }]),
+          actions: JSON.stringify([{ type: ACTION_TYPES.SEND_NOTIFICATION, message: 'Alert' }]),
+          priority: 100,
+          status: 'active',
+          effective_from: new Date('2024-01-01'),
+          effective_until: null
+        }
+      ];
+
+      const academicRulesQuery = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockResolvedValue(dbRules)
+      };
+
+      mockDb.mockImplementation(() => academicRulesQuery);
+
+      const context = { attendance_percentage: 70 };
+      const rules = await academicRuleService.getApplicableRules(mockTenantId, context);
+
+      expect(rules).toHaveLength(1);
+    });
+
+    it('should handle Redis write errors gracefully', async () => {
+      mockRedis.get.mockResolvedValue(null);
+      mockRedis.setex.mockRejectedValue(new Error('Redis write error'));
+
+      const dbRules = [
+        {
+          rule_id: 'rule-1',
+          tenant_id: mockTenantId,
+          rule_name: 'Test Rule',
+          rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+          conditions: JSON.stringify([{ field: 'attendance_percentage', operator: '<', value: 75 }]),
+          actions: JSON.stringify([{ type: ACTION_TYPES.SEND_NOTIFICATION, message: 'Alert' }]),
+          priority: 100,
+          status: 'active',
+          effective_from: new Date('2024-01-01'),
+          effective_until: null
+        }
+      ];
+
+      const academicRulesQuery = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockResolvedValue(dbRules)
+      };
+
+      mockDb.mockImplementation(() => academicRulesQuery);
+
+      const context = { attendance_percentage: 70 };
+      const rules = await academicRuleService.getApplicableRules(mockTenantId, context);
+
+      expect(rules).toHaveLength(1);
+    });
+  });
+
+  describe('validateActionParameters - Edge cases', () => {
+    it('should reject APPLY_GRACE_MARKS with invalid max_marks', () => {
+      const action = { type: ACTION_TYPES.APPLY_GRACE_MARKS, marks: 5, max_marks: -1 };
+      
+      expect(() => academicRuleService.validateActionParameters(action, 0))
+        .toThrow('max_marks must be a positive number');
+    });
+
+    it('should reject APPLY_GRACE_MARKS with non-number max_marks', () => {
+      const action = { type: ACTION_TYPES.APPLY_GRACE_MARKS, marks: 5, max_marks: 'invalid' };
+      
+      expect(() => academicRuleService.validateActionParameters(action, 0))
+        .toThrow('max_marks must be a positive number');
+    });
+  });
+
+  describe('validateRuleConfig - Condition validation', () => {
+    it('should reject condition without field', () => {
+      const config = {
+        tenant_id: mockTenantId,
+        name: 'Invalid Rule',
+        type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: [{ operator: '<', value: 75 }],
+        actions: [{ type: ACTION_TYPES.SET_ELIGIBILITY, eligible: false }],
+        created_by: mockUserId
+      };
+
+      expect(() => academicRuleService.validateRuleConfig(config))
+        .toThrow('must have field, operator, and value');
+    });
+
+    it('should reject condition without operator', () => {
+      const config = {
+        tenant_id: mockTenantId,
+        name: 'Invalid Rule',
+        type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: [{ field: 'attendance', value: 75 }],
+        actions: [{ type: ACTION_TYPES.SET_ELIGIBILITY, eligible: false }],
+        created_by: mockUserId
+      };
+
+      expect(() => academicRuleService.validateRuleConfig(config))
+        .toThrow('must have field, operator, and value');
+    });
+
+    it('should reject condition without value', () => {
+      const config = {
+        tenant_id: mockTenantId,
+        name: 'Invalid Rule',
+        type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: [{ field: 'attendance', operator: '<' }],
+        actions: [{ type: ACTION_TYPES.SET_ELIGIBILITY, eligible: false }],
+        created_by: mockUserId
+      };
+
+      expect(() => academicRuleService.validateRuleConfig(config))
+        .toThrow('must have field, operator, and value');
+    });
+
+    it('should reject action without type', () => {
+      const config = {
+        tenant_id: mockTenantId,
+        name: 'Invalid Rule',
+        type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: [{ field: 'attendance', operator: '<', value: 75 }],
+        actions: [{ eligible: false }],
+        created_by: mockUserId
+      };
+
+      expect(() => academicRuleService.validateRuleConfig(config))
+        .toThrow('must have type');
+    });
+
+    it('should reject invalid action type', () => {
+      const config = {
+        tenant_id: mockTenantId,
+        name: 'Invalid Rule',
+        type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: [{ field: 'attendance', operator: '<', value: 75 }],
+        actions: [{ type: 'invalid_action' }],
+        created_by: mockUserId
+      };
+
+      expect(() => academicRuleService.validateRuleConfig(config))
+        .toThrow('Invalid action type');
+    });
+  });
+
+  describe('isAmbiguousConditionPair - Mixed operators', () => {
+    it('should detect overlapping > and >= conditions', () => {
+      const cond1 = { field: 'score', operator: '>', value: 75 };
+      const cond2 = { field: 'score', operator: '>=', value: 80 };
+
+      const result = academicRuleService.isAmbiguousConditionPair(cond1, cond2);
+      expect(result).toBe(true);
+    });
+
+    it('should detect overlapping < and <= conditions', () => {
+      const cond1 = { field: 'score', operator: '<', value: 40 };
+      const cond2 = { field: 'score', operator: '<=', value: 35 };
+
+      const result = academicRuleService.isAmbiguousConditionPair(cond1, cond2);
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('evaluateRulesForStudent - Performance logging', () => {
+    it('should log warning when latency exceeds 100ms', async () => {
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      const mockRule = {
+        rule_id: 'rule-1',
+        tenant_id: mockTenantId,
+        rule_name: 'Slow Rule',
+        rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: JSON.stringify([{ field: 'attendance_percentage', operator: '<', value: 75 }]),
+        actions: JSON.stringify([{ type: ACTION_TYPES.SEND_NOTIFICATION, message: 'Alert' }]),
+        priority: 100,
+        status: 'active',
+        effective_from: new Date('2024-01-01'),
+        effective_until: null
+      };
+
+      const academicRulesQuery = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockImplementation(() => {
+          // Simulate slow query
+          return new Promise(resolve => setTimeout(() => resolve([mockRule]), 150));
+        })
+      };
+
+      const evaluationsQuery = {
+        insert: jest.fn().mockResolvedValue([]),
+        where: jest.fn().mockReturnThis(),
+        update: jest.fn().mockResolvedValue([])
+      };
+
+      const notificationsQuery = {
+        insert: jest.fn().mockResolvedValue([])
+      };
+
+      mockDb.mockImplementation((tableName) => {
+        if (tableName === 'academic_rules') {
+          return academicRulesQuery;
+        } else if (tableName === 'rule_evaluations') {
+          return evaluationsQuery;
+        } else if (tableName === 'notifications') {
+          return notificationsQuery;
+        }
+        return academicRulesQuery;
+      });
+
+      const context = { attendance_percentage: 70 };
+      await academicRuleService.evaluateRulesForStudent(mockStudentId, mockTenantId, context);
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Rule evaluation latency exceeded 100ms')
+      );
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('Database operations without Redis', () => {
+    it('should work without Redis initialized', async () => {
+      academicRuleService.initialize(mockDb, null);
+
+      await academicRuleService.invalidateRuleCache(mockTenantId);
+      // Should not throw
+    });
+  });
+});
+
+
+describe('AcademicRuleService - Complete Branch Coverage', () => {
+  const mockTenantId = 'tenant-123';
+  const mockStudentId = 'student-456';
+  const mockUserId = 'user-789';
+
+  let mockDb;
+  let mockRedis;
+
+  beforeEach(() => {
+    const mockQuery = {
+      where: jest.fn().mockReturnThis(),
+      whereNull: jest.fn().mockReturnThis(),
+      whereNot: jest.fn().mockReturnThis(),
+      orWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      offset: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      first: jest.fn().mockResolvedValue(null),
+      insert: jest.fn().mockResolvedValue([]),
+      update: jest.fn().mockResolvedValue([])
+    };
+
+    mockDb = jest.fn(() => mockQuery);
+    Object.assign(mockDb, mockQuery);
+
+    mockRedis = {
+      get: jest.fn().mockResolvedValue(null),
+      setex: jest.fn().mockResolvedValue('OK'),
+      del: jest.fn().mockResolvedValue(1)
+    };
+
+    academicRuleService.initialize(mockDb, mockRedis);
+  });
+
+  describe('updateRule - with actions', () => {
+    it('should update rule with new actions', async () => {
+      const existingRule = {
+        rule_id: 'rule-123',
+        tenant_id: mockTenantId,
+        rule_name: 'Test Rule',
+        rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: JSON.stringify([{ field: 'attendance_percentage', operator: '<', value: 75 }]),
+        actions: JSON.stringify([{ type: ACTION_TYPES.SET_ELIGIBILITY, eligible: false }]),
+        status: 'active'
+      };
+
+      const getRuleQuery = {
+        where: jest.fn().mockReturnThis(),
+        first: jest.fn()
+          .mockResolvedValueOnce(existingRule)
+          .mockResolvedValueOnce(existingRule)
+      };
+
+      const updateQuery = {
+        where: jest.fn().mockReturnThis(),
+        update: jest.fn().mockResolvedValue([])
+      };
+
+      let callCount = 0;
+      mockDb.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1 || callCount === 3) return getRuleQuery;
+        return updateQuery;
+      });
+
+      const updates = {
+        actions: [{ type: ACTION_TYPES.SEND_NOTIFICATION, message: 'New notification' }]
+      };
+
+      await academicRuleService.updateRule('rule-123', mockTenantId, updates);
+
+      expect(updateQuery.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actions: expect.any(String)
+        })
+      );
+    });
+  });
+
+  describe('evaluateRulesForStudent - error handling', () => {
+    it('should handle errors during rule evaluation', async () => {
+      const academicRulesQuery = {
+        where: jest.fn().mockRejectedValue(new Error('Database error'))
+      };
+
+      mockDb.mockImplementation(() => academicRulesQuery);
+
+      const context = { attendance_percentage: 70 };
+
+      await expect(
+        academicRuleService.evaluateRulesForStudent(mockStudentId, mockTenantId, context)
+      ).rejects.toThrow('Database error');
+    });
+  });
+
+  describe('executeRuleActions - error handling', () => {
+    it('should handle action execution errors gracefully', async () => {
+      const mockRule = {
+        rule_id: 'rule-1',
+        tenant_id: mockTenantId,
+        rule_name: 'Test Rule',
+        rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: JSON.stringify([{ field: 'attendance_percentage', operator: '<', value: 75 }]),
+        actions: JSON.stringify([
+          { type: 'invalid_action_type' }
+        ]),
+        priority: 100,
+        status: 'active',
+        effective_from: new Date('2024-01-01'),
+        effective_until: null
+      };
+
+      const academicRulesQuery = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockResolvedValue([mockRule])
+      };
+
+      const evaluationsQuery = {
+        insert: jest.fn().mockResolvedValue([]),
+        where: jest.fn().mockReturnThis(),
+        update: jest.fn().mockResolvedValue([])
+      };
+
+      mockDb.mockImplementation((tableName) => {
+        if (tableName === 'academic_rules') {
+          return academicRulesQuery;
+        } else if (tableName === 'rule_evaluations') {
+          return evaluationsQuery;
+        }
+        return academicRulesQuery;
+      });
+
+      const context = { attendance_percentage: 70 };
+
+      const evaluations = await academicRuleService.evaluateRulesForStudent(
+        mockStudentId,
+        mockTenantId,
+        context
+      );
+
+      expect(evaluations).toHaveLength(1);
+      expect(evaluations[0].condition_met).toBe(true);
+    });
+  });
+
+  describe('logEvaluation - error handling', () => {
+    it('should handle logging errors gracefully', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      const mockRule = {
+        rule_id: 'rule-1',
+        tenant_id: mockTenantId,
+        rule_name: 'Test Rule',
+        rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: JSON.stringify([{ field: 'attendance_percentage', operator: '<', value: 75 }]),
+        actions: JSON.stringify([{ type: ACTION_TYPES.SET_ELIGIBILITY, eligible: true }]),
+        priority: 100,
+        status: 'active',
+        effective_from: new Date('2024-01-01'),
+        effective_until: null
+      };
+
+      const academicRulesQuery = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockResolvedValue([mockRule])
+      };
+
+      const evaluationsQuery = {
+        insert: jest.fn().mockRejectedValue(new Error('Insert failed')),
+        where: jest.fn().mockReturnThis(),
+        update: jest.fn().mockResolvedValue([])
+      };
+
+      mockDb.mockImplementation((tableName) => {
+        if (tableName === 'academic_rules') {
+          return academicRulesQuery;
+        } else if (tableName === 'rule_evaluations') {
+          return evaluationsQuery;
+        }
+        return academicRulesQuery;
+      });
+
+      const context = { attendance_percentage: 70 };
+
+      const evaluations = await academicRuleService.evaluateRulesForStudent(
+        mockStudentId,
+        mockTenantId,
+        context
+      );
+
+      expect(evaluations).toHaveLength(1);
+      expect(consoleSpy).toHaveBeenCalledWith('Error logging evaluation:', expect.any(Error));
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('filterRulesByContext - empty context', () => {
+    it('should return empty array when no relevant context fields', () => {
+      const rules = [
+        { rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD, rule_id: 'rule-1' },
+        { rule_type: RULE_TYPES.GRADE_ELIGIBILITY, rule_id: 'rule-2' }
+      ];
+      const context = { irrelevant_field: 'value' };
+
+      const filtered = academicRuleService.filterRulesByContext(rules, context);
+      expect(filtered).toHaveLength(0);
+    });
+
+    it('should include both GRADE_ELIGIBILITY and GRACE_MARKS for grade context', () => {
+      const rules = [
+        { rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD, rule_id: 'rule-1' },
+        { rule_type: RULE_TYPES.GRADE_ELIGIBILITY, rule_id: 'rule-2' },
+        { rule_type: RULE_TYPES.GRACE_MARKS, rule_id: 'rule-3' }
+      ];
+      const context = { grade: 65 };
+
+      const filtered = academicRuleService.filterRulesByContext(rules, context);
+      expect(filtered).toHaveLength(2);
+      expect(filtered.map(r => r.rule_id)).toEqual(['rule-2', 'rule-3']);
+    });
+  });
+
+  describe('evaluateCondition - edge cases', () => {
+    it('should handle in operator with non-array value', () => {
+      const condition = { field: 'status', operator: 'in', value: 'not-an-array' };
+      const context = { status: 'active' };
+      
+      const result = academicRuleService.evaluateCondition(condition, context);
+      expect(result).toBe(false);
+    });
+
+    it('should handle not_in operator with non-array value', () => {
+      const condition = { field: 'status', operator: 'not_in', value: 'not-an-array' };
+      const context = { status: 'active' };
+      
+      const result = academicRuleService.evaluateCondition(condition, context);
+      expect(result).toBe(false);
+    });
+
+    it('should handle in operator when value not in array', () => {
+      const condition = { field: 'status', operator: 'in', value: ['pending', 'rejected'] };
+      const context = { status: 'active' };
+      
+      const result = academicRuleService.evaluateCondition(condition, context);
+      expect(result).toBe(false);
+    });
+
+    it('should handle not_in operator when value is in array', () => {
+      const condition = { field: 'status', operator: 'not_in', value: ['active', 'pending'] };
+      const context = { status: 'active' };
+      
+      const result = academicRuleService.evaluateCondition(condition, context);
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('applyGraceMarks - with grade instead of marks', () => {
+    it('should use grade when marks is not available', async () => {
+      const action = { type: ACTION_TYPES.APPLY_GRACE_MARKS, marks: 5 };
+      const rule = { rule_id: 'rule-1', rule_name: 'Grace Marks Rule' };
+      const context = { grade: 60 };
+
+      const result = await academicRuleService.applyGraceMarks(
+        mockStudentId,
+        mockTenantId,
+        action.marks,
+        undefined,
+        context
+      );
+
+      expect(result.original_marks).toBe(60);
+      expect(result.new_marks).toBe(65);
+    });
+  });
+
+  describe('formatNotificationMessage - multiple replacements', () => {
+    it('should replace multiple occurrences of same variable', () => {
+      const template = 'Your attendance is {{attendance_percentage}}%. Minimum required: {{attendance_percentage}}%';
+      const context = { attendance_percentage: 70 };
+      const rule = { rule_name: 'Test Rule' };
+
+      const formatted = academicRuleService.formatNotificationMessage(
+        template,
+        context,
+        rule
+      );
+
+      expect(formatted).toBe('Your attendance is 70%. Minimum required: 70%');
+    });
+
+    it('should handle template with no variables', () => {
+      const template = 'This is a static message';
+      const context = { attendance_percentage: 70 };
+      const rule = { rule_name: 'Test Rule' };
+
+      const formatted = academicRuleService.formatNotificationMessage(
+        template,
+        context,
+        rule
+      );
+
+      expect(formatted).toBe('This is a static message');
+    });
+
+    it('should replace multiple different variables', () => {
+      const template = 'Rule {{rule_name}}: Your attendance is {{attendance_percentage}}%';
+      const context = { attendance_percentage: 70 };
+      const rule = { rule_name: 'Attendance Alert' };
+
+      const formatted = academicRuleService.formatNotificationMessage(
+        template,
+        context,
+        rule
+      );
+
+      expect(formatted).toBe('Rule Attendance Alert: Your attendance is 70%');
+    });
+  });
+
+  describe('validateActionParameters - all branches', () => {
+    it('should accept valid APPLY_GRACE_MARKS without max_marks', () => {
+      const action = { type: ACTION_TYPES.APPLY_GRACE_MARKS, marks: 5 };
+      
+      expect(() => academicRuleService.validateActionParameters(action, 0)).not.toThrow();
+    });
+
+    it('should accept valid APPLY_GRACE_MARKS with valid max_marks', () => {
+      const action = { type: ACTION_TYPES.APPLY_GRACE_MARKS, marks: 5, max_marks: 10 };
+      
+      expect(() => academicRuleService.validateActionParameters(action, 0)).not.toThrow();
+    });
+  });
+
+  describe('hasConflictingConditions - no conflicts', () => {
+    it('should return false when conditions are on different fields', () => {
+      const conditions1 = [
+        { field: 'attendance_percentage', operator: '<', value: 75 }
+      ];
+      const conditions2 = [
+        { field: 'grade', operator: '<', value: 60 }
+      ];
+
+      const result = academicRuleService.hasConflictingConditions(conditions1, conditions2);
+      expect(result).toBe(false);
+    });
+
+    it('should return false when no conditions match', () => {
+      const conditions1 = [
+        { field: 'field1', operator: '<', value: 75 }
+      ];
+      const conditions2 = [
+        { field: 'field2', operator: '<', value: 60 }
+      ];
+
+      const result = academicRuleService.hasConflictingConditions(conditions1, conditions2);
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('isAmbiguousConditionPair - all branches', () => {
+    it('should return false for different operators on same field', () => {
+      const cond1 = { field: 'score', operator: '>=', value: 75 };
+      const cond2 = { field: 'score', operator: '==', value: 75 };
+
+      const result = academicRuleService.isAmbiguousConditionPair(cond1, cond2);
+      expect(result).toBe(false);
+    });
+
+    it('should return false for same operator but different values that dont overlap', () => {
+      const cond1 = { field: 'score', operator: '==', value: 75 };
+      const cond2 = { field: 'score', operator: '==', value: 80 };
+
+      const result = academicRuleService.isAmbiguousConditionPair(cond1, cond2);
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('getEvaluationHistory - with ruleId filter', () => {
+    it('should filter by ruleId when provided', async () => {
+      const mockEvaluations = [
+        {
+          evaluation_id: 'eval-1',
+          rule_id: 'rule-1',
+          tenant_id: mockTenantId,
+          student_id: mockStudentId,
+          context: JSON.stringify({ attendance_percentage: 70 }),
+          condition_met: true,
+          action_executed: true,
+          action_result: null,
+          evaluated_at: new Date()
+        }
+      ];
+
+      const evaluationsQuery = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockResolvedValue(mockEvaluations)
+      };
+
+      mockDb.mockImplementation(() => evaluationsQuery);
+
+      const history = await academicRuleService.getEvaluationHistory(
+        mockStudentId,
+        mockTenantId,
+        { limit: 50, offset: 0, ruleId: 'rule-1' }
+      );
+
+      expect(history).toHaveLength(1);
+      expect(evaluationsQuery.where).toHaveBeenCalledWith({ rule_id: 'rule-1' });
+    });
+  });
+});

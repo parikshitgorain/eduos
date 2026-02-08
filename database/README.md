@@ -77,7 +77,9 @@ database/
    ├── 023_backup_system.sql                  # Backup and disaster recovery ✅
    ├── 023_backup_system_rollback.sql         # Backup system rollback
    ├── 024_performance_indexes.sql            # Performance optimization ✅
-   └── 024_performance_indexes_rollback.sql   # Performance indexes rollback
+   ├── 024_performance_indexes_rollback.sql   # Performance indexes rollback
+   ├── 025_academic_rules.sql                 # Academic rule engine ✅
+   └── 025_academic_rules_rollback.sql        # Academic rules rollback
 ├── tests/                              # Test suites
 │   └── rls_isolation.test.sql         # RLS isolation tests
 └── docs/                               # Documentation
@@ -268,6 +270,36 @@ database/
     - Confidence scoring
     - RLS-protected
 
+### Phase 5: Advanced Features (Tasks 5.1.1 - 5.1.3) ✅
+
+#### Academic Policy & Rule Engine (Tasks 5.1.1 - 5.1.3)
+
+31. **academic_rules** - Academic policy rules
+    - Rule configuration with JSON conditions and actions
+    - Rule types: attendance_threshold, grade_eligibility, grace_marks
+    - Priority-based ordering and conflict detection
+    - Date-based activation (effective_from, effective_until)
+    - RLS-protected
+
+32. **rule_evaluations** - Rule evaluation audit trail
+    - Complete history of all rule evaluations
+    - Evaluation results and actions taken
+    - Student and rule associations
+    - RLS-protected
+
+33. **rule_overrides** - Rule override requests
+    - Override request tracking with reason and supporting documents
+    - Configurable approval chain (Teacher → Admin → Dean)
+    - Status tracking: pending, approved, rejected
+    - Approval history with timestamps
+    - RLS-protected
+
+34. **rule_override_audit** - Rule override audit trail
+    - Immutable audit log for all override decisions
+    - Complete approval chain history
+    - Decision justifications and timestamps
+    - RLS-protected
+
 ### Security Features
 
 - ✅ Row-Level Security (RLS) enabled on all core tables (Task 1.1.1)
@@ -283,6 +315,9 @@ database/
 - ✅ Cryptographic snapshots for merge operations (Task 3.3.1)
 - ✅ Webhook signature verification (HMAC-SHA256) (Task 4.1.2)
 - ✅ Idempotent webhook processing (Task 4.1.2)
+- ✅ Academic rule configuration with conflict detection (Task 5.1.1)
+- ✅ Real-time rule evaluation with caching (Task 5.1.2)
+- ✅ Rule override workflow with approval chains (Task 5.1.3)
 
 ### Database Functions
 
@@ -291,6 +326,8 @@ database/
 - `get_user_permissions()` - Resolve user permissions with role inheritance (Task 1.3.2)
 - `check_role_hierarchy()` - Validate role hierarchy constraints (Task 1.3.2)
 - `cleanup_old_webhook_logs()` - Automatic cleanup of webhook logs after 90 days (Task 4.1.2)
+- `evaluate_academic_rule()` - Evaluate academic rules against student data (Task 5.1.2)
+- `check_rule_conflicts()` - Detect conflicts between academic rules (Task 5.1.1)
 
 ### Extensions
 

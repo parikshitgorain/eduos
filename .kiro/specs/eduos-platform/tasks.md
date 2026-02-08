@@ -562,7 +562,7 @@ Each task is considered complete when:
     - Notification: alert students/admins when rule triggered
     - Audit log: all rule evaluations recorded
 
-- [ ] 5.1.3 Create rule override workflow
+- [x] 5.1.3 Create rule override workflow
   - **Definition of Done:**
     - Override request form: reason, supporting documents
     - Approval chain: configurable (Teacher → Admin → Dean)

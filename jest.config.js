@@ -1,5 +1,14 @@
 module.exports = {
   testEnvironment: 'node',
+  // Exclude client directory - it uses Vitest, not Jest
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/client/',
+  ],
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/client/',
+  ],
   coverageThreshold: {
     global: {
       branches: 80,
