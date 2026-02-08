@@ -580,7 +580,7 @@ Each task is considered complete when:
 
 ### 5.2 Scheduling & AI Optimization Engine
 
-- [ ] 5.2.1 Build scheduling conflict detection
+- [x] 5.2.1 Build scheduling conflict detection
   - **Definition of Done:**
     - Detect hard conflicts: room, teacher, batch double-booking
     - Real-time validation: immediate feedback on assignment

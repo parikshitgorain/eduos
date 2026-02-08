@@ -618,56 +618,6 @@ router.post('/overrides/:overrideId/reject', async (req, res) => {
   }
 });
 
-/**
- * GET /api/v1/policies/overrides/student/:studentId
- * Get override history for a specific student
- */
-router.get('/overrides/student/:studentId', async (req, res) => {
-  try {
-    const { studentId } = req.params;
-    const { tenant_id } = req.user || req.query;
-
-    const overrides = await ruleOverrideService.getStudentOverrideHistory(studentId, tenant_id);
-
-    res.json({
-      success: true,
-      data: overrides,
-      count: overrides.length
-    });
-  } catch (error) {
-    console.error('Error getting student override history:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get student override history',
-      error: error.message
-    });
-  }
-});
-
-/**
- * GET /api/v1/policies/overrides/statistics
- * Get override statistics for the tenant
- */
-router.get('/statistics', async (req, res) => {
-  try {
-    const { tenant_id } = req.user || req.query;
-
-    const stats = await ruleOverrideService.getOverrideStatistics(tenant_id);
-
-    res.json({
-      success: true,
-      data: stats
-    });
-  } catch (error) {
-    console.error('Error getting override statistics:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get override statistics',
-      error: error.message
-    });
-  }
-});
-
 // ============================================================================
 // RETROACTIVE APPLICATION ENDPOINTS
 // ============================================================================

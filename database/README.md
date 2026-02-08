@@ -79,7 +79,11 @@ database/
    ├── 024_performance_indexes.sql            # Performance optimization ✅
    ├── 024_performance_indexes_rollback.sql   # Performance indexes rollback
    ├── 025_academic_rules.sql                 # Academic rule engine ✅
-   └── 025_academic_rules_rollback.sql        # Academic rules rollback
+   ├── 025_academic_rules_rollback.sql        # Academic rules rollback
+   ├── 026_password_reset_tokens.sql          # Password reset tokens ✅
+   ├── 026_password_reset_tokens_rollback.sql # Password reset rollback
+   ├── 027_scheduling_system.sql              # Scheduling conflict detection ✅
+   └── 027_scheduling_system_rollback.sql     # Scheduling system rollback
 ├── tests/                              # Test suites
 │   └── rls_isolation.test.sql         # RLS isolation tests
 └── docs/                               # Documentation
@@ -314,6 +318,50 @@ database/
     - SHA-256 hash for integrity verification
     - RLS-protected
 
+### Phase 5: Advanced Features - Scheduling (Task 5.2.1) ✅
+
+37. **rooms** - Room/classroom management
+    - Room capacity and availability tracking
+    - Building and floor information
+    - Equipment and facility details
+    - RLS-protected
+
+38. **teachers** - Teacher information
+    - Teacher profiles and contact details
+    - Subject specializations
+    - Availability tracking
+    - RLS-protected
+
+39. **subjects** - Subject/course definitions
+    - Subject codes and names
+    - Credit hours and duration
+    - Department associations
+    - RLS-protected
+
+40. **batches** - Student batches (enhanced)
+    - Batch capacity and enrollment tracking
+    - Academic year and semester information
+    - Program associations
+    - RLS-protected
+
+41. **schedule_slots** - Scheduled class sessions
+    - Time slot definitions (day, start_time, end_time)
+    - Room, teacher, subject, and batch assignments
+    - Recurring schedule support
+    - RLS-protected
+
+42. **schedule_overrides** - Schedule exceptions
+    - One-time schedule changes
+    - Holiday and event management
+    - Cancellation tracking
+    - RLS-protected
+
+43. **schedule_conflicts** - Detected scheduling conflicts
+    - Conflict type tracking (room, teacher, batch)
+    - Conflict severity levels
+    - Resolution status
+    - RLS-protected
+
 ### Security Features
 
 - ✅ Row-Level Security (RLS) enabled on all core tables (Task 1.1.1)
@@ -333,6 +381,7 @@ database/
 - ✅ Real-time rule evaluation with caching (Task 5.1.2)
 - ✅ Rule override workflow with approval chains (Task 5.1.3)
 - ✅ Prospective vs retroactive rule application with rollback (Task 5.1.4)
+- ✅ Scheduling conflict detection with real-time validation (Task 5.2.1)
 
 ### Database Functions
 
@@ -345,6 +394,7 @@ database/
 - `check_rule_conflicts()` - Detect conflicts between academic rules (Task 5.1.1)
 - `analyze_retroactive_impact()` - Analyze impact of retroactive rule application (Task 5.1.4)
 - `apply_rule_retroactively()` - Apply rules to historical data with batch processing (Task 5.1.4)
+- `detect_schedule_conflicts()` - Detect scheduling conflicts for rooms, teachers, and batches (Task 5.2.1)
 
 ### Extensions
 

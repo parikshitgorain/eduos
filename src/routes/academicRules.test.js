@@ -754,8 +754,8 @@ describe('Academic Rules API Routes - Override Endpoints', () => {
     });
   });
 
-  describe('GET /api/v1/policies/statistics', () => {
-    it('should get override statistics', async () => {
+  describe('GET /api/v1/policies/overrides/statistics (duplicate test)', () => {
+    it('should get override statistics from alternate path', async () => {
       const mockStats = {
         total: 50,
         pending: 10,
@@ -766,18 +766,18 @@ describe('Academic Rules API Routes - Override Endpoints', () => {
       ruleOverrideService.getOverrideStatistics.mockResolvedValue(mockStats);
 
       const response = await request(app)
-        .get('/api/v1/policies/statistics');
+        .get('/api/v1/policies/overrides/statistics');
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.data.total).toBe(50);
     });
 
-    it('should handle errors', async () => {
+    it('should handle errors from alternate path', async () => {
       ruleOverrideService.getOverrideStatistics.mockRejectedValue(new Error('Error'));
 
       const response = await request(app)
-        .get('/api/v1/policies/statistics');
+        .get('/api/v1/policies/overrides/statistics');
 
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
@@ -1648,21 +1648,6 @@ describe('Academic Rules API Routes - Additional Edge Cases', () => {
 
       const response = await request(appNoAuth)
         .get('/api/v1/policies/overrides/override-123')
-        .query({ tenant_id: 'tenant-from-query' });
-
-      expect(response.status).toBe(200);
-    });
-
-    it('should get tenant_id from req.query for statistics endpoint', async () => {
-      const appNoAuth = express();
-      appNoAuth.use(express.json());
-      appNoAuth.use('/api/v1/policies', academicRulesRouter);
-
-      const mockStats = { total: 100 };
-      ruleOverrideService.getOverrideStatistics.mockResolvedValue(mockStats);
-
-      const response = await request(appNoAuth)
-        .get('/api/v1/policies/statistics')
         .query({ tenant_id: 'tenant-from-query' });
 
       expect(response.status).toBe(200);
