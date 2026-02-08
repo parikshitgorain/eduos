@@ -12,6 +12,22 @@ let tracer = null;
  * Initialize the Jaeger tracer
  */
 function initializeTracer(serviceName = 'eduos-api') {
+  // Disable Jaeger in test environment
+  if (process.env.NODE_ENV === 'test') {
+    // Return a no-op tracer for tests
+    tracer = {
+      startSpan: () => ({
+        setTag: () => {},
+        log: () => {},
+        finish: () => {},
+      }),
+      extract: () => null,
+      inject: () => {},
+      close: () => {},
+    };
+    return tracer;
+  }
+
   const config = {
     serviceName,
     sampler: {
