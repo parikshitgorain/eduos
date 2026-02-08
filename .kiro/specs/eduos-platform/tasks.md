@@ -588,7 +588,7 @@ Each task is considered complete when:
     - API: POST `/api/v1/schedules/validate` returns conflicts
     - UI: visual conflict indicators on schedule grid
 
-- [ ] 5.2.2 Implement AI-assisted schedule optimization
+- [x] 5.2.2 Implement AI-assisted schedule optimization
   - **Definition of Done:**
     - Algorithm: Constraint Satisfaction Problem (CSP) or Genetic Algorithm
     - Optimization goals: room utilization, minimize teacher gaps

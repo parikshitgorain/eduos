@@ -30,6 +30,9 @@ from semantic_matching import get_semantic_matcher
 # Import explainability dashboard
 from explainability import get_explainability_dashboard
 
+# Import schedule optimizer
+from schedule_optimizer import optimize_schedule
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -970,6 +973,239 @@ async def export_dashboard_report(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to export dashboard report: {str(e)}"
+        )
+
+
+# ============================================================================
+# SCHEDULE OPTIMIZATION ENDPOINTS (Task 5.2.2)
+# ============================================================================
+
+class ScheduleSession(BaseModel):
+    """Session to be scheduled"""
+    session_id: str
+    subject_id: str
+    subject_name: str
+    teacher_id: str
+    teacher_name: str
+    batch_id: str
+    batch_name: str
+    batch_size: int
+    duration_minutes: int = 60
+    sessions_per_week: int = 1
+
+
+class ScheduleTimeSlot(BaseModel):
+    """Available time slot"""
+    day_of_week: int = Field(..., ge=0, le=6, description="0=Sunday, 6=Saturday")
+    start_time: str = Field(..., pattern="^([0-1][0-9]|2[0-3]):[0-5][0-9]$", description="HH:MM format")
+    end_time: str = Field(..., pattern="^([0-1][0-9]|2[0-3]):[0-5][0-9]$", description="HH:MM format")
+
+
+class ScheduleRoom(BaseModel):
+    """Available room"""
+    room_id: str
+    room_name: str
+    capacity: int
+    room_type: str = "classroom"
+
+
+class ScheduleOptimizationRequest(BaseModel):
+    """Request for schedule optimization"""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "sessions": [
+                {
+                    "session_id": "session_1",
+                    "subject_id": "math_101",
+                    "subject_name": "Mathematics 101",
+                    "teacher_id": "teacher_1",
+                    "teacher_name": "Prof. Smith",
+                    "batch_id": "batch_a",
+                    "batch_name": "Batch A",
+                    "batch_size": 30,
+                    "duration_minutes": 60,
+                    "sessions_per_week": 3
+                }
+            ],
+            "time_slots": [
+                {
+                    "day_of_week": 1,
+                    "start_time": "09:00",
+                    "end_time": "10:00"
+                }
+            ],
+            "rooms": [
+                {
+                    "room_id": "room_101",
+                    "room_name": "Room 101",
+                    "capacity": 40,
+                    "room_type": "classroom"
+                }
+            ],
+            "num_proposals": 3
+        }
+    })
+    
+    sessions: List[ScheduleSession]
+    time_slots: List[ScheduleTimeSlot]
+    rooms: List[ScheduleRoom]
+    num_proposals: int = Field(3, ge=1, le=5, description="Number of schedule proposals to generate")
+    
+    @field_validator('sessions')
+    @classmethod
+    def validate_sessions_count(cls, v):
+        if len(v) > 500:
+            raise ValueError('Maximum 500 sessions per optimization request')
+        if len(v) == 0:
+            raise ValueError('At least one session is required')
+        return v
+    
+    @field_validator('time_slots')
+    @classmethod
+    def validate_time_slots_count(cls, v):
+        if len(v) == 0:
+            raise ValueError('At least one time slot is required')
+        return v
+    
+    @field_validator('rooms')
+    @classmethod
+    def validate_rooms_count(cls, v):
+        if len(v) == 0:
+            raise ValueError('At least one room is required')
+        return v
+
+
+class ScheduleAssignment(BaseModel):
+    """A single schedule assignment"""
+    session_id: str
+    subject_name: str
+    teacher_name: str
+    batch_name: str
+    day_of_week: int
+    start_time: str
+    end_time: str
+    room_name: str
+    room_capacity: int
+    batch_size: int
+
+
+class ScheduleProposal(BaseModel):
+    """A schedule optimization proposal"""
+    proposal_id: str
+    assignments: List[ScheduleAssignment]
+    fitness_score: float = Field(..., ge=0.0, le=1.0)
+    hard_constraint_violations: int
+    soft_constraint_score: int
+    summary: Dict[str, Any]
+
+
+class ScheduleOptimizationResponse(BaseModel):
+    """Response for schedule optimization"""
+    proposals: List[ScheduleProposal]
+    total_proposals: int
+    processing_time_ms: float
+    algorithm_used: str
+    advisory_note: str
+
+
+@app.post("/api/v1/schedule/optimize", response_model=ScheduleOptimizationResponse, tags=["Schedule Optimization"])
+async def optimize_schedule_endpoint(request: ScheduleOptimizationRequest):
+    """
+    Generate optimized schedule proposals using Genetic Algorithm
+    
+    Task 5.2.2: Implement AI-assisted schedule optimization
+    
+    Algorithm: Genetic Algorithm (GA) for large-scale scheduling
+    - Population size: 100 schedules
+    - Generations: 500 iterations
+    - Fitness function: Hard constraints + Soft constraints
+    
+    Hard Constraints (must be satisfied):
+    - Room conflict: No double-booking of rooms
+    - Teacher conflict: No double-booking of teachers
+    - Batch conflict: No double-booking of student batches
+    - Room capacity: Batch size must not exceed room capacity
+    
+    Soft Constraints (optimization goals):
+    - Minimize teacher gaps: Reduce idle time between sessions
+    - Maximize room utilization: Prefer filling larger rooms efficiently
+    - Balanced workload: Distribute sessions evenly across days
+    
+    Output:
+    - 3 valid schedule options (configurable 1-5)
+    - Each option scored on optimization criteria
+    - Admin must explicitly publish one option (no auto-publish)
+    
+    ADVISORY MODE: This endpoint generates proposals only.
+    Human approval is required before publishing any schedule.
+    """
+    try:
+        start_time = datetime.now(timezone.utc)
+        
+        # Check AI Kill Switch
+        kill_switch_status = governance_manager.get_kill_switch_status()
+        if not kill_switch_status.enabled:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="AI services are currently disabled via Kill Switch"
+            )
+        
+        logger.info(f"Starting schedule optimization for {len(request.sessions)} sessions")
+        
+        # Convert Pydantic models to dicts
+        sessions_data = [session.model_dump() for session in request.sessions]
+        time_slots_data = [ts.model_dump() for ts in request.time_slots]
+        rooms_data = [room.model_dump() for room in request.rooms]
+        
+        # Call optimization function
+        proposals = optimize_schedule(
+            sessions_data=sessions_data,
+            time_slots_data=time_slots_data,
+            rooms_data=rooms_data,
+            num_proposals=request.num_proposals
+        )
+        
+        end_time = datetime.now(timezone.utc)
+        processing_time_ms = (end_time - start_time).total_seconds() * 1000
+        
+        logger.info(f"Generated {len(proposals)} schedule proposals in {processing_time_ms:.2f}ms")
+        
+        # Convert proposals to response format
+        proposal_responses = []
+        for i, proposal in enumerate(proposals):
+            # Generate unique proposal ID
+            proposal_id = f"proposal_{i+1}_{int(start_time.timestamp())}"
+            
+            # Convert assignments
+            assignments = [
+                ScheduleAssignment(**assignment)
+                for assignment in proposal['assignments']
+            ]
+            
+            proposal_responses.append(ScheduleProposal(
+                proposal_id=proposal_id,
+                assignments=assignments,
+                fitness_score=proposal['fitness_score'],
+                hard_constraint_violations=proposal['hard_constraint_violations'],
+                soft_constraint_score=proposal['soft_constraint_score'],
+                summary=proposal['summary']
+            ))
+        
+        return ScheduleOptimizationResponse(
+            proposals=proposal_responses,
+            total_proposals=len(proposal_responses),
+            processing_time_ms=processing_time_ms,
+            algorithm_used="Genetic Algorithm (GA)",
+            advisory_note="These are AI-generated proposals. Admin must explicitly publish one option. No auto-publish."
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in schedule optimization: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Schedule optimization failed: {str(e)}"
         )
 
 

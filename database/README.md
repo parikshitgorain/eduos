@@ -83,7 +83,9 @@ database/
    ├── 026_password_reset_tokens.sql          # Password reset tokens ✅
    ├── 026_password_reset_tokens_rollback.sql # Password reset rollback
    ├── 027_scheduling_system.sql              # Scheduling conflict detection ✅
-   └── 027_scheduling_system_rollback.sql     # Scheduling system rollback
+   ├── 027_scheduling_system_rollback.sql     # Scheduling system rollback
+   ├── 028_schedule_proposals.sql             # AI schedule optimization proposals ✅
+   └── 028_schedule_proposals_rollback.sql    # Schedule proposals rollback
 ├── tests/                              # Test suites
 │   └── rls_isolation.test.sql         # RLS isolation tests
 └── docs/                               # Documentation

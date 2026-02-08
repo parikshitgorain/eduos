@@ -381,3 +381,233 @@ router.get('/conflicts/list', async (req, res) => {
 });
 
 module.exports = router;
+
+
+/**
+ * POST /api/v1/schedules/optimize
+ * Request AI-assisted schedule optimization
+ * Task 5.2.2: Implement AI-assisted schedule optimization
+ */
+router.post('/optimize', async (req, res) => {
+  try {
+    const {
+      academic_term_id,
+      sessions,
+      time_slots,
+      rooms,
+      num_proposals = 3
+    } = req.body;
+
+    const tenant_id = req.user.tenant_id;
+    const requested_by = req.user.user_id;
+
+    // Validate input
+    if (!academic_term_id) {
+      return res.status(400).json({
+        error: 'academic_term_id is required'
+      });
+    }
+
+    if (!sessions || !Array.isArray(sessions) || sessions.length === 0) {
+      return res.status(400).json({
+        error: 'sessions array is required and must not be empty'
+      });
+    }
+
+    if (!time_slots || !Array.isArray(time_slots) || time_slots.length === 0) {
+      return res.status(400).json({
+        error: 'time_slots array is required and must not be empty'
+      });
+    }
+
+    if (!rooms || !Array.isArray(rooms) || rooms.length === 0) {
+      return res.status(400).json({
+        error: 'rooms array is required and must not be empty'
+      });
+    }
+
+    // Request optimization from AI service
+    const result = await schedulingService.requestScheduleOptimization({
+      tenant_id,
+      academic_term_id,
+      sessions,
+      time_slots,
+      rooms,
+      num_proposals,
+      requested_by
+    });
+
+    res.status(200).json({
+      message: 'Schedule optimization completed successfully',
+      ...result
+    });
+
+  } catch (error) {
+    console.error('Error in schedule optimization:', error);
+    res.status(500).json({
+      error: 'Failed to optimize schedule',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/v1/schedules/proposals
+ * Get schedule proposals for a tenant
+ */
+router.get('/proposals', async (req, res) => {
+  try {
+    const tenant_id = req.user.tenant_id;
+    const { academic_term_id, status } = req.query;
+
+    const proposals = await schedulingService.getScheduleProposals(tenant_id, {
+      academic_term_id,
+      status
+    });
+
+    res.status(200).json({
+      proposals,
+      total: proposals.length
+    });
+
+  } catch (error) {
+    console.error('Error fetching schedule proposals:', error);
+    res.status(500).json({
+      error: 'Failed to fetch schedule proposals',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/v1/schedules/proposals/:proposal_id
+ * Get a specific schedule proposal
+ */
+router.get('/proposals/:proposal_id', async (req, res) => {
+  try {
+    const { proposal_id } = req.params;
+    const tenant_id = req.user.tenant_id;
+
+    const proposal = await schedulingService.getScheduleProposal(proposal_id, tenant_id);
+
+    res.status(200).json(proposal);
+
+  } catch (error) {
+    console.error('Error fetching schedule proposal:', error);
+    
+    if (error.message === 'Schedule proposal not found') {
+      return res.status(404).json({
+        error: 'Schedule proposal not found'
+      });
+    }
+
+    res.status(500).json({
+      error: 'Failed to fetch schedule proposal',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/v1/schedules/proposals/:proposal_id/publish
+ * Publish a schedule proposal (Human approval required)
+ * CRITICAL: Admin must explicitly publish - no auto-publish
+ */
+router.post('/proposals/:proposal_id/publish', async (req, res) => {
+  try {
+    const { proposal_id } = req.params;
+    const { publish_reason } = req.body;
+    const tenant_id = req.user.tenant_id;
+    const published_by = req.user.user_id;
+
+    // Validate publish reason
+    if (!publish_reason || publish_reason.trim().length === 0) {
+      return res.status(400).json({
+        error: 'publish_reason is required'
+      });
+    }
+
+    // Publish the proposal
+    const result = await schedulingService.publishScheduleProposal(
+      proposal_id,
+      tenant_id,
+      published_by,
+      publish_reason
+    );
+
+    res.status(200).json({
+      message: 'Schedule proposal published successfully',
+      ...result
+    });
+
+  } catch (error) {
+    console.error('Error publishing schedule proposal:', error);
+    
+    if (error.message === 'Schedule proposal not found') {
+      return res.status(404).json({
+        error: 'Schedule proposal not found'
+      });
+    }
+
+    if (error.message.includes('already been published') || 
+        error.message.includes('rejected proposal')) {
+      return res.status(400).json({
+        error: error.message
+      });
+    }
+
+    res.status(500).json({
+      error: 'Failed to publish schedule proposal',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/v1/schedules/proposals/:proposal_id/reject
+ * Reject a schedule proposal
+ */
+router.post('/proposals/:proposal_id/reject', async (req, res) => {
+  try {
+    const { proposal_id } = req.params;
+    const { rejection_reason } = req.body;
+    const tenant_id = req.user.tenant_id;
+    const rejected_by = req.user.user_id;
+
+    // Validate rejection reason
+    if (!rejection_reason || rejection_reason.trim().length === 0) {
+      return res.status(400).json({
+        error: 'rejection_reason is required'
+      });
+    }
+
+    // Reject the proposal
+    const result = await schedulingService.rejectScheduleProposal(
+      proposal_id,
+      tenant_id,
+      rejected_by,
+      rejection_reason
+    );
+
+    res.status(200).json({
+      message: 'Schedule proposal rejected successfully',
+      proposal: result
+    });
+
+  } catch (error) {
+    console.error('Error rejecting schedule proposal:', error);
+    
+    if (error.message === 'Schedule proposal not found') {
+      return res.status(404).json({
+        error: 'Schedule proposal not found'
+      });
+    }
+
+    res.status(500).json({
+      error: 'Failed to reject schedule proposal',
+      details: error.message
+    });
+  }
+});
+
+module.exports = router;
