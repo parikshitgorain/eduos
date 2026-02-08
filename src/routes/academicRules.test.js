@@ -992,3 +992,799 @@ describe('Academic Rules API Routes - Additional Branch Coverage', () => {
     });
   });
 });
+
+describe('Academic Rules API Routes - Retroactive Application Endpoints', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('POST /api/v1/policies/retroactive/analyze', () => {
+    it('should analyze retroactive impact successfully', async () => {
+      const mockImpact = {
+        affected_students: 150,
+        estimated_changes: 45,
+        risk_level: 'medium'
+      };
+
+      academicRuleService.analyzeRetroactiveImpact.mockResolvedValue(mockImpact);
+
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/analyze')
+        .send({
+          rule_id: 'rule-123',
+          start_date: '2024-01-01',
+          end_date: '2024-12-31',
+          sample_size: 1000
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.affected_students).toBe(150);
+      expect(academicRuleService.analyzeRetroactiveImpact).toHaveBeenCalledWith(
+        'rule-123',
+        'tenant-456',
+        expect.objectContaining({
+          startDate: '2024-01-01',
+          endDate: '2024-12-31',
+          sampleSize: 1000
+        })
+      );
+    });
+
+    it('should return 400 when rule_id is missing', async () => {
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/analyze')
+        .send({
+          start_date: '2024-01-01',
+          end_date: '2024-12-31'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain('rule_id is required');
+    });
+
+    it('should handle analysis errors', async () => {
+      academicRuleService.analyzeRetroactiveImpact.mockRejectedValue(
+        new Error('Analysis failed')
+      );
+
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/analyze')
+        .send({
+          rule_id: 'rule-123',
+          start_date: '2024-01-01'
+        });
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain('Failed to analyze retroactive impact');
+    });
+  });
+
+  describe('POST /api/v1/policies/retroactive/request', () => {
+    it('should create retroactive application request successfully', async () => {
+      const mockRequest = {
+        request_id: 'req-123',
+        rule_id: 'rule-456',
+        status: 'pending_approval'
+      };
+
+      academicRuleService.requestRetroactiveApplication.mockResolvedValue(mockRequest);
+
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/request')
+        .send({
+          rule_id: 'rule-456',
+          start_date: '2024-01-01',
+          end_date: '2024-12-31',
+          reason: 'Need to apply new policy to past semester'
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.request_id).toBe('req-123');
+    });
+
+    it('should return 400 when rule_id is missing', async () => {
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/request')
+        .send({
+          reason: 'Test reason'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain('rule_id and reason are required');
+    });
+
+    it('should return 400 when reason is missing', async () => {
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/request')
+        .send({
+          rule_id: 'rule-456'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain('rule_id and reason are required');
+    });
+
+    it('should handle creation errors', async () => {
+      academicRuleService.requestRetroactiveApplication.mockRejectedValue(
+        new Error('Invalid request')
+      );
+
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/request')
+        .send({
+          rule_id: 'rule-456',
+          reason: 'Test reason'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+    });
+  });
+
+  describe('GET /api/v1/policies/retroactive/requests', () => {
+    it('should list retroactive requests', async () => {
+      const mockRequests = [
+        { request_id: 'req-1', status: 'pending_approval' },
+        { request_id: 'req-2', status: 'approved' }
+      ];
+
+      academicRuleService.listRetroactiveRequests.mockResolvedValue(mockRequests);
+
+      const response = await request(app)
+        .get('/api/v1/policies/retroactive/requests');
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveLength(2);
+      expect(response.body.count).toBe(2);
+    });
+
+    it('should filter requests by status and rule_id', async () => {
+      academicRuleService.listRetroactiveRequests.mockResolvedValue([]);
+
+      const response = await request(app)
+        .get('/api/v1/policies/retroactive/requests')
+        .query({ status: 'pending_approval', rule_id: 'rule-123' });
+
+      expect(response.status).toBe(200);
+      expect(academicRuleService.listRetroactiveRequests).toHaveBeenCalledWith(
+        'tenant-456',
+        expect.objectContaining({ status: 'pending_approval', rule_id: 'rule-123' })
+      );
+    });
+
+    it('should handle errors', async () => {
+      academicRuleService.listRetroactiveRequests.mockRejectedValue(
+        new Error('Database error')
+      );
+
+      const response = await request(app)
+        .get('/api/v1/policies/retroactive/requests');
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+    });
+  });
+
+  describe('POST /api/v1/policies/retroactive/:requestId/approve', () => {
+    it('should approve retroactive request successfully', async () => {
+      const mockRequest = {
+        request_id: 'req-123',
+        status: 'approved'
+      };
+
+      academicRuleService.approveRetroactiveRequest.mockResolvedValue(mockRequest);
+
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/req-123/approve')
+        .send({
+          approver_id: 'admin-456'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.status).toBe('approved');
+    });
+
+    it('should return 400 when approver_id is missing', async () => {
+      // Create app without auth middleware to test missing approver_id
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      const response = await request(appNoAuth)
+        .post('/api/v1/policies/retroactive/req-123/approve')
+        .send({ tenant_id: 'tenant-456' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain('approver_id is required');
+    });
+
+    it('should return 404 for non-existent request', async () => {
+      academicRuleService.approveRetroactiveRequest.mockRejectedValue(
+        new Error('Request not found')
+      );
+
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/non-existent/approve')
+        .send({ approver_id: 'admin-456' });
+
+      expect(response.status).toBe(404);
+      expect(response.body.success).toBe(false);
+    });
+
+    it('should handle other errors', async () => {
+      academicRuleService.approveRetroactiveRequest.mockRejectedValue(
+        new Error('Approval failed')
+      );
+
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/req-123/approve')
+        .send({ approver_id: 'admin-456' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+    });
+  });
+
+  describe('POST /api/v1/policies/retroactive/:requestId/reject', () => {
+    it('should reject retroactive request successfully', async () => {
+      const mockRequest = {
+        request_id: 'req-123',
+        status: 'rejected'
+      };
+
+      academicRuleService.rejectRetroactiveRequest.mockResolvedValue(mockRequest);
+
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/req-123/reject')
+        .send({
+          approver_id: 'admin-456',
+          reason: 'Insufficient justification'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.status).toBe('rejected');
+    });
+
+    it('should return 400 when approver_id is missing', async () => {
+      // Create app without auth middleware to test missing approver_id
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      const response = await request(appNoAuth)
+        .post('/api/v1/policies/retroactive/req-123/reject')
+        .send({ tenant_id: 'tenant-456', reason: 'Test' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain('approver_id is required');
+    });
+
+    it('should return 400 when reason is missing', async () => {
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/req-123/reject')
+        .send({ approver_id: 'admin-456' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain('reason is required for rejection');
+    });
+
+    it('should return 404 for non-existent request', async () => {
+      academicRuleService.rejectRetroactiveRequest.mockRejectedValue(
+        new Error('Request not found')
+      );
+
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/non-existent/reject')
+        .send({ approver_id: 'admin-456', reason: 'Test' });
+
+      expect(response.status).toBe(404);
+      expect(response.body.success).toBe(false);
+    });
+
+    it('should handle other errors', async () => {
+      academicRuleService.rejectRetroactiveRequest.mockRejectedValue(
+        new Error('Rejection failed')
+      );
+
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/req-123/reject')
+        .send({ approver_id: 'admin-456', reason: 'Test' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+    });
+  });
+
+  describe('POST /api/v1/policies/retroactive/:requestId/apply', () => {
+    it('should apply retroactive request successfully', async () => {
+      const mockResult = {
+        processed: 100,
+        successful: 95,
+        failed: 5
+      };
+
+      academicRuleService.applyRuleRetroactively.mockResolvedValue(mockResult);
+
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/req-123/apply')
+        .send({
+          batch_size: 100,
+          dry_run: false
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.processed).toBe(100);
+      expect(response.body.message).toContain('completed successfully');
+    });
+
+    it('should handle dry run mode', async () => {
+      const mockResult = {
+        would_process: 100,
+        estimated_changes: 45
+      };
+
+      academicRuleService.applyRuleRetroactively.mockResolvedValue(mockResult);
+
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/req-123/apply')
+        .send({
+          dry_run: true
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.message).toContain('Dry run completed successfully');
+    });
+
+    it('should return 404 for non-existent request', async () => {
+      academicRuleService.applyRuleRetroactively.mockRejectedValue(
+        new Error('Request not found')
+      );
+
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/non-existent/apply')
+        .send({});
+
+      expect(response.status).toBe(404);
+      expect(response.body.success).toBe(false);
+    });
+
+    it('should handle application errors', async () => {
+      academicRuleService.applyRuleRetroactively.mockRejectedValue(
+        new Error('Application failed')
+      );
+
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/req-123/apply')
+        .send({});
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+    });
+  });
+
+  describe('POST /api/v1/policies/retroactive/snapshots/:snapshotId/rollback', () => {
+    it('should rollback retroactive application successfully', async () => {
+      const mockResult = {
+        rolled_back: 95,
+        snapshot_id: 'snap-123'
+      };
+
+      academicRuleService.rollbackRetroactiveApplication.mockResolvedValue(mockResult);
+
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/snapshots/snap-123/rollback');
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.rolled_back).toBe(95);
+      expect(response.body.message).toContain('rolled back successfully');
+    });
+
+    it('should return 404 for non-existent snapshot', async () => {
+      academicRuleService.rollbackRetroactiveApplication.mockRejectedValue(
+        new Error('Snapshot not found')
+      );
+
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/snapshots/non-existent/rollback');
+
+      expect(response.status).toBe(404);
+      expect(response.body.success).toBe(false);
+    });
+
+    it('should handle rollback errors', async () => {
+      academicRuleService.rollbackRetroactiveApplication.mockRejectedValue(
+        new Error('Rollback failed')
+      );
+
+      const response = await request(app)
+        .post('/api/v1/policies/retroactive/snapshots/snap-123/rollback');
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+    });
+  });
+});
+
+describe('Academic Rules API Routes - Additional Edge Cases', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('Tenant ID from req.body for retroactive endpoints', () => {
+    it('should get tenant_id from req.body for retroactive analyze', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      const mockImpact = { affected_students: 50 };
+      academicRuleService.analyzeRetroactiveImpact.mockResolvedValue(mockImpact);
+
+      const response = await request(appNoAuth)
+        .post('/api/v1/policies/retroactive/analyze')
+        .send({
+          tenant_id: 'tenant-from-body',
+          rule_id: 'rule-123'
+        });
+
+      expect(response.status).toBe(200);
+      expect(academicRuleService.analyzeRetroactiveImpact).toHaveBeenCalledWith(
+        'rule-123',
+        'tenant-from-body',
+        expect.any(Object)
+      );
+    });
+
+    it('should get tenant_id from req.body for retroactive request', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      const mockRequest = { request_id: 'req-123' };
+      academicRuleService.requestRetroactiveApplication.mockResolvedValue(mockRequest);
+
+      const response = await request(appNoAuth)
+        .post('/api/v1/policies/retroactive/request')
+        .send({
+          tenant_id: 'tenant-from-body',
+          rule_id: 'rule-456',
+          reason: 'Test reason',
+          requested_by: 'user-123'
+        });
+
+      expect(response.status).toBe(201);
+    });
+
+    it('should get tenant_id from req.query for retroactive requests list', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      academicRuleService.listRetroactiveRequests.mockResolvedValue([]);
+
+      const response = await request(appNoAuth)
+        .get('/api/v1/policies/retroactive/requests')
+        .query({ tenant_id: 'tenant-from-query' });
+
+      expect(response.status).toBe(200);
+      expect(academicRuleService.listRetroactiveRequests).toHaveBeenCalledWith(
+        'tenant-from-query',
+        expect.any(Object)
+      );
+    });
+
+    it('should get tenant_id from req.body for retroactive apply', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      const mockResult = { processed: 100 };
+      academicRuleService.applyRuleRetroactively.mockResolvedValue(mockResult);
+
+      const response = await request(appNoAuth)
+        .post('/api/v1/policies/retroactive/req-123/apply')
+        .send({ tenant_id: 'tenant-from-body' });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should get tenant_id from req.body for rollback', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      const mockResult = { rolled_back: 50 };
+      academicRuleService.rollbackRetroactiveApplication.mockResolvedValue(mockResult);
+
+      const response = await request(appNoAuth)
+        .post('/api/v1/policies/retroactive/snapshots/snap-123/rollback')
+        .send({ tenant_id: 'tenant-from-body' });
+
+      expect(response.status).toBe(200);
+    });
+  });
+
+  describe('Override endpoints - tenant_id from req.body', () => {
+    it('should get tenant_id from req.body for override creation', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      const mockOverride = { override_id: 'override-123' };
+      ruleOverrideService.createOverrideRequest.mockResolvedValue(mockOverride);
+
+      const response = await request(appNoAuth)
+        .post('/api/v1/policies/overrides')
+        .send({
+          tenant_id: 'tenant-from-body',
+          rule_id: 'rule-456',
+          student_id: 'student-789',
+          reason: 'Test',
+          requested_by: 'user-123'
+        });
+
+      expect(response.status).toBe(201);
+    });
+
+    it('should get tenant_id from req.body for override approve', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      const mockOverride = { override_id: 'override-123', status: 'approved' };
+      ruleOverrideService.processApproval.mockResolvedValue(mockOverride);
+
+      const response = await request(appNoAuth)
+        .post('/api/v1/policies/overrides/override-123/approve')
+        .send({
+          tenant_id: 'tenant-from-body',
+          approver_role: 'teacher',
+          approver_id: 'admin-456'
+        });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should get tenant_id from req.body for override reject', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      const mockOverride = { override_id: 'override-123', status: 'rejected' };
+      ruleOverrideService.processApproval.mockResolvedValue(mockOverride);
+
+      const response = await request(appNoAuth)
+        .post('/api/v1/policies/overrides/override-123/reject')
+        .send({
+          tenant_id: 'tenant-from-body',
+          approver_role: 'admin',
+          approver_id: 'admin-456',
+          reason: 'Test reason'
+        });
+
+      expect(response.status).toBe(200);
+    });
+  });
+
+  describe('Override endpoints - tenant_id from req.query', () => {
+    it('should get tenant_id from req.query for overrides list', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      ruleOverrideService.listOverrides.mockResolvedValue([]);
+
+      const response = await request(appNoAuth)
+        .get('/api/v1/policies/overrides')
+        .query({ tenant_id: 'tenant-from-query' });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should get tenant_id from req.query for override statistics', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      const mockStats = { total: 50 };
+      ruleOverrideService.getOverrideStatistics.mockResolvedValue(mockStats);
+
+      const response = await request(appNoAuth)
+        .get('/api/v1/policies/overrides/statistics')
+        .query({ tenant_id: 'tenant-from-query' });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should get tenant_id from req.query for pending overrides by role', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      ruleOverrideService.getPendingOverridesForRole.mockResolvedValue([]);
+
+      const response = await request(appNoAuth)
+        .get('/api/v1/policies/overrides/pending/teacher')
+        .query({ tenant_id: 'tenant-from-query' });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should get tenant_id from req.query for student override history', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      ruleOverrideService.getStudentOverrideHistory.mockResolvedValue([]);
+
+      const response = await request(appNoAuth)
+        .get('/api/v1/policies/overrides/student/student-123')
+        .query({ tenant_id: 'tenant-from-query' });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should get tenant_id from req.query for override by ID', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      const mockOverride = { override_id: 'override-123' };
+      ruleOverrideService.getOverrideById.mockResolvedValue(mockOverride);
+
+      const response = await request(appNoAuth)
+        .get('/api/v1/policies/overrides/override-123')
+        .query({ tenant_id: 'tenant-from-query' });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should get tenant_id from req.query for statistics endpoint', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      const mockStats = { total: 100 };
+      ruleOverrideService.getOverrideStatistics.mockResolvedValue(mockStats);
+
+      const response = await request(appNoAuth)
+        .get('/api/v1/policies/statistics')
+        .query({ tenant_id: 'tenant-from-query' });
+
+      expect(response.status).toBe(200);
+    });
+  });
+
+  describe('Rules endpoints - tenant_id from req.query', () => {
+    it('should get tenant_id from req.query for get rule by ID', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      const mockRule = { rule_id: 'rule-123' };
+      academicRuleService.getRuleById.mockResolvedValue(mockRule);
+
+      const response = await request(appNoAuth)
+        .get('/api/v1/policies/rules/rule-123')
+        .query({ tenant_id: 'tenant-from-query' });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should get tenant_id from req.query for delete rule', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      academicRuleService.deleteRule.mockResolvedValue();
+
+      const response = await request(appNoAuth)
+        .delete('/api/v1/policies/rules/rule-123')
+        .query({ tenant_id: 'tenant-from-query' });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should get tenant_id from req.query for evaluation history', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      academicRuleService.getEvaluationHistory.mockResolvedValue([]);
+
+      const response = await request(appNoAuth)
+        .get('/api/v1/policies/rules/evaluations/student-123')
+        .query({ tenant_id: 'tenant-from-query' });
+
+      expect(response.status).toBe(200);
+    });
+  });
+
+  describe('Rules endpoints - tenant_id from req.body', () => {
+    it('should get tenant_id from req.body for update rule', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      const mockRule = { rule_id: 'rule-123' };
+      academicRuleService.updateRule.mockResolvedValue(mockRule);
+
+      const response = await request(appNoAuth)
+        .put('/api/v1/policies/rules/rule-123')
+        .send({
+          tenant_id: 'tenant-from-body',
+          rule_name: 'Updated'
+        });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should get tenant_id from req.body for deactivate rule', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      const mockRule = { rule_id: 'rule-123', status: 'inactive' };
+      academicRuleService.deactivateRule.mockResolvedValue(mockRule);
+
+      const response = await request(appNoAuth)
+        .post('/api/v1/policies/rules/rule-123/deactivate')
+        .send({ tenant_id: 'tenant-from-body' });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should get tenant_id from req.body for validate rule', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      academicRuleService.validateRuleConfig.mockReturnValue(true);
+      academicRuleService.checkRuleConflicts.mockResolvedValue();
+
+      const response = await request(appNoAuth)
+        .post('/api/v1/policies/rules/validate')
+        .send({
+          tenant_id: 'tenant-from-body',
+          name: 'Test',
+          type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+          conditions: [],
+          actions: []
+        });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should get tenant_id from req.body for evaluate rules', async () => {
+      const appNoAuth = express();
+      appNoAuth.use(express.json());
+      appNoAuth.use('/api/v1/policies', academicRulesRouter);
+
+      academicRuleService.evaluateRulesForStudent.mockResolvedValue([]);
+
+      const response = await request(appNoAuth)
+        .post('/api/v1/policies/rules/evaluate')
+        .send({
+          tenant_id: 'tenant-from-body',
+          student_id: 'student-123',
+          context: { attendance_percentage: 70 }
+        });
+
+      expect(response.status).toBe(200);
+    });
+  });
+});

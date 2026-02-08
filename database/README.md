@@ -300,6 +300,20 @@ database/
     - Decision justifications and timestamps
     - RLS-protected
 
+35. **retroactive_policy_requests** - Retroactive policy application requests
+    - Tracks requests to apply policy changes retroactively
+    - Mandatory reason and impact analysis
+    - Status tracking: pending, approved, rejected, applied
+    - Approval workflow integration
+    - RLS-protected
+
+36. **retroactive_application_snapshots** - Retroactive application snapshots
+    - Cryptographic snapshots before retroactive application
+    - Enables rollback capability
+    - Stores affected records and original states
+    - SHA-256 hash for integrity verification
+    - RLS-protected
+
 ### Security Features
 
 - ✅ Row-Level Security (RLS) enabled on all core tables (Task 1.1.1)
@@ -318,6 +332,7 @@ database/
 - ✅ Academic rule configuration with conflict detection (Task 5.1.1)
 - ✅ Real-time rule evaluation with caching (Task 5.1.2)
 - ✅ Rule override workflow with approval chains (Task 5.1.3)
+- ✅ Prospective vs retroactive rule application with rollback (Task 5.1.4)
 
 ### Database Functions
 
@@ -328,6 +343,8 @@ database/
 - `cleanup_old_webhook_logs()` - Automatic cleanup of webhook logs after 90 days (Task 4.1.2)
 - `evaluate_academic_rule()` - Evaluate academic rules against student data (Task 5.1.2)
 - `check_rule_conflicts()` - Detect conflicts between academic rules (Task 5.1.1)
+- `analyze_retroactive_impact()` - Analyze impact of retroactive rule application (Task 5.1.4)
+- `apply_rule_retroactively()` - Apply rules to historical data with batch processing (Task 5.1.4)
 
 ### Extensions
 

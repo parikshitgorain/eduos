@@ -668,5 +668,286 @@ router.get('/statistics', async (req, res) => {
   }
 });
 
+// ============================================================================
+// RETROACTIVE APPLICATION ENDPOINTS
+// ============================================================================
+
+/**
+ * POST /api/v1/policies/retroactive/analyze
+ * Analyze impact of applying a rule retroactively
+ * 
+ * Request Body:
+ * {
+ *   "rule_id": "uuid",
+ *   "start_date": "2024-01-01",
+ *   "end_date": "2024-12-31",
+ *   "sample_size": 1000
+ * }
+ */
+router.post('/retroactive/analyze', async (req, res) => {
+  try {
+    const { tenant_id } = req.user || req.body;
+    const { rule_id, start_date, end_date, sample_size } = req.body;
+
+    if (!rule_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'rule_id is required'
+      });
+    }
+
+    const impact = await academicRuleService.analyzeRetroactiveImpact(rule_id, tenant_id, {
+      startDate: start_date,
+      endDate: end_date,
+      sampleSize: sample_size
+    });
+
+    res.json({
+      success: true,
+      message: 'Impact analysis completed',
+      data: impact
+    });
+  } catch (error) {
+    console.error('Error analyzing retroactive impact:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to analyze retroactive impact',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/v1/policies/retroactive/request
+ * Request retroactive application of a rule
+ * 
+ * Request Body:
+ * {
+ *   "rule_id": "uuid",
+ *   "start_date": "2024-01-01",
+ *   "end_date": "2024-12-31",
+ *   "reason": "Need to apply new attendance policy to past semester"
+ * }
+ */
+router.post('/retroactive/request', async (req, res) => {
+  try {
+    const { tenant_id } = req.user || req.body;
+    const { rule_id, start_date, end_date, reason } = req.body;
+
+    if (!rule_id || !reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'rule_id and reason are required'
+      });
+    }
+
+    const request = await academicRuleService.requestRetroactiveApplication(rule_id, tenant_id, {
+      requested_by: req.user?.user_id || req.body.requested_by,
+      start_date,
+      end_date,
+      reason
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Retroactive application request created successfully',
+      data: request
+    });
+  } catch (error) {
+    console.error('Error creating retroactive request:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to create retroactive request',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/v1/policies/retroactive/requests
+ * List retroactive application requests
+ * 
+ * Query Parameters:
+ * - status: Filter by status (pending_approval, approved, rejected)
+ * - rule_id: Filter by rule ID
+ */
+router.get('/retroactive/requests', async (req, res) => {
+  try {
+    const { tenant_id } = req.user || req.query;
+    const filters = {
+      status: req.query.status,
+      rule_id: req.query.rule_id
+    };
+
+    const requests = await academicRuleService.listRetroactiveRequests(tenant_id, filters);
+
+    res.json({
+      success: true,
+      data: requests,
+      count: requests.length
+    });
+  } catch (error) {
+    console.error('Error listing retroactive requests:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to list retroactive requests',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/v1/policies/retroactive/:requestId/approve
+ * Approve a retroactive application request
+ * 
+ * Request Body:
+ * {
+ *   "approver_id": "uuid" // Optional if from req.user
+ * }
+ */
+router.post('/retroactive/:requestId/approve', async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { tenant_id } = req.user || req.body;
+    const approvedBy = req.user?.user_id || req.body.approver_id;
+
+    if (!approvedBy) {
+      return res.status(400).json({
+        success: false,
+        message: 'approver_id is required'
+      });
+    }
+
+    const request = await academicRuleService.approveRetroactiveRequest(requestId, tenant_id, approvedBy);
+
+    res.json({
+      success: true,
+      message: 'Retroactive application request approved successfully',
+      data: request
+    });
+  } catch (error) {
+    console.error('Error approving retroactive request:', error);
+    const statusCode = error.message.includes('not found') ? 404 : 400;
+    res.status(statusCode).json({
+      success: false,
+      message: error.message || 'Failed to approve retroactive request',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/v1/policies/retroactive/:requestId/reject
+ * Reject a retroactive application request
+ * 
+ * Request Body:
+ * {
+ *   "approver_id": "uuid", // Optional if from req.user
+ *   "reason": "Insufficient justification for retroactive application"
+ * }
+ */
+router.post('/retroactive/:requestId/reject', async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { tenant_id } = req.user || req.body;
+    const rejectedBy = req.user?.user_id || req.body.approver_id;
+    const { reason } = req.body;
+
+    if (!rejectedBy) {
+      return res.status(400).json({
+        success: false,
+        message: 'approver_id is required'
+      });
+    }
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'reason is required for rejection'
+      });
+    }
+
+    const request = await academicRuleService.rejectRetroactiveRequest(requestId, tenant_id, rejectedBy, reason);
+
+    res.json({
+      success: true,
+      message: 'Retroactive application request rejected',
+      data: request
+    });
+  } catch (error) {
+    console.error('Error rejecting retroactive request:', error);
+    const statusCode = error.message.includes('not found') ? 404 : 400;
+    res.status(statusCode).json({
+      success: false,
+      message: error.message || 'Failed to reject retroactive request',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/v1/policies/retroactive/:requestId/apply
+ * Apply an approved retroactive request (batch processing)
+ * 
+ * Request Body:
+ * {
+ *   "batch_size": 100, // Optional, default 100
+ *   "dry_run": false // Optional, default false
+ * }
+ */
+router.post('/retroactive/:requestId/apply', async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { tenant_id } = req.user || req.body;
+    const { batch_size, dry_run } = req.body;
+
+    const result = await academicRuleService.applyRuleRetroactively(requestId, tenant_id, {
+      batchSize: batch_size,
+      dryRun: dry_run
+    });
+
+    res.json({
+      success: true,
+      message: dry_run ? 'Dry run completed successfully' : 'Retroactive application completed successfully',
+      data: result
+    });
+  } catch (error) {
+    console.error('Error applying retroactive request:', error);
+    const statusCode = error.message.includes('not found') ? 404 : 500;
+    res.status(statusCode).json({
+      success: false,
+      message: error.message || 'Failed to apply retroactive request',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/v1/policies/retroactive/snapshots/:snapshotId/rollback
+ * Rollback a retroactive application using a snapshot
+ */
+router.post('/retroactive/snapshots/:snapshotId/rollback', async (req, res) => {
+  try {
+    const { snapshotId } = req.params;
+    const { tenant_id } = req.user || req.body;
+
+    const result = await academicRuleService.rollbackRetroactiveApplication(snapshotId, tenant_id);
+
+    res.json({
+      success: true,
+      message: 'Retroactive application rolled back successfully',
+      data: result
+    });
+  } catch (error) {
+    console.error('Error rolling back retroactive application:', error);
+    const statusCode = error.message.includes('not found') ? 404 : 500;
+    res.status(statusCode).json({
+      success: false,
+      message: error.message || 'Failed to rollback retroactive application',
+      error: error.message
+    });
+  }
+});
+
 
 module.exports = router;

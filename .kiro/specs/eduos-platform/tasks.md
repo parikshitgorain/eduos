@@ -570,7 +570,7 @@ Each task is considered complete when:
     - Audit trail: all overrides logged with justification
     - Notification: email to requester on decision
 
-- [ ] 5.1.4 Implement prospective vs retroactive application
+- [x] 5.1.4 Implement prospective vs retroactive application
   - **Definition of Done:**
     - Default: rules apply prospectively (future data only)
     - Retroactive option: requires special approval

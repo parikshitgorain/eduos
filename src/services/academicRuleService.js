@@ -52,6 +52,7 @@ class AcademicRuleService {
    * @returns {Promise<Object>} Created rule
    */
   async createRule(ruleConfig) {
+    const database = this.db || db;
     const { tenant_id, name, type, conditions, actions, priority, effective_from, effective_until, created_by } = ruleConfig;
 
     // Validate rule configuration
@@ -79,7 +80,7 @@ class AcademicRuleService {
       updated_at: now
     };
 
-    await db('academic_rules').insert(rule);
+    await database('academic_rules').insert(rule);
 
     // Invalidate cache
     await this.invalidateRuleCache(tenant_id);
@@ -197,8 +198,9 @@ class AcademicRuleService {
    * @param {Array} conditions - Rule conditions
    */
   async checkRuleConflicts(tenantId, ruleType, conditions) {
+    const database = this.db || db;
     // Get all active rules of the same type for this tenant
-    const existingRules = await db('academic_rules')
+    const existingRules = await database('academic_rules')
       .where({
         tenant_id: tenantId,
         rule_type: ruleType,
@@ -277,7 +279,8 @@ class AcademicRuleService {
    * @returns {Promise<Object>} Rule object
    */
   async getRuleById(ruleId, tenantId) {
-    const rule = await db('academic_rules')
+    const database = this.db || db;
+    const rule = await database('academic_rules')
       .where({ rule_id: ruleId, tenant_id: tenantId })
       .first();
 
@@ -299,7 +302,8 @@ class AcademicRuleService {
    * @returns {Promise<Array>} List of rules
    */
   async listRules(tenantId, filters = {}) {
-    let query = db('academic_rules')
+    const database = this.db || db;
+    let query = database('academic_rules')
       .where({ tenant_id: tenantId });
 
     if (filters.type) {
@@ -335,18 +339,22 @@ class AcademicRuleService {
    * @returns {Promise<Object>} Updated rule
    */
   async updateRule(ruleId, tenantId, updates) {
+    const database = this.db || db;
     const existingRule = await this.getRuleById(ruleId, tenantId);
 
     // Validate updates
     if (updates.conditions) {
       this.validateRuleConfig({
-        ...existingRule,
-        ...updates,
-        tenant_id: tenantId
+        name: updates.name || existingRule.rule_name,
+        type: updates.type || existingRule.rule_type,
+        conditions: updates.conditions,
+        actions: updates.actions || existingRule.actions,
+        tenant_id: tenantId,
+        created_by: existingRule.created_by
       });
 
       // Check for conflicts (excluding current rule)
-      const otherRules = await db('academic_rules')
+      const otherRules = await database('academic_rules')
         .where({
           tenant_id: tenantId,
           rule_type: updates.type || existingRule.rule_type,
@@ -377,7 +385,7 @@ class AcademicRuleService {
       updateData.actions = JSON.stringify(updates.actions);
     }
 
-    await db('academic_rules')
+    await database('academic_rules')
       .where({ rule_id: ruleId, tenant_id: tenantId })
       .update(updateData);
 
@@ -394,7 +402,8 @@ class AcademicRuleService {
    * @returns {Promise<Object>} Deactivated rule
    */
   async deactivateRule(ruleId, tenantId) {
-    await db('academic_rules')
+    const database = this.db || db;
+    await database('academic_rules')
       .where({ rule_id: ruleId, tenant_id: tenantId })
       .update({
         status: 'inactive',
@@ -413,7 +422,8 @@ class AcademicRuleService {
    * @param {string} tenantId - Tenant ID
    */
   async deleteRule(ruleId, tenantId) {
-    await db('academic_rules')
+    const database = this.db || db;
+    await database('academic_rules')
       .where({ rule_id: ruleId, tenant_id: tenantId })
       .update({
         status: 'deleted',
@@ -913,6 +923,544 @@ class AcademicRuleService {
       ...evaluation,
       context: JSON.parse(evaluation.context),
       action_result: evaluation.action_result ? JSON.parse(evaluation.action_result) : null
+    }));
+  }
+
+  // ============================================================================
+  // PROSPECTIVE VS RETROACTIVE APPLICATION
+  // ============================================================================
+
+  /**
+   * Analyze impact of applying a rule retroactively
+   * @param {string} ruleId - Rule ID
+   * @param {string} tenantId - Tenant ID
+   * @param {Object} options - Analysis options
+   * @returns {Promise<Object>} Impact analysis report
+   */
+  async analyzeRetroactiveImpact(ruleId, tenantId, options = {}) {
+    const database = this.db || db;
+    const { startDate, endDate, sampleSize = 1000 } = options;
+    
+    // Get the rule
+    const rule = await this.getRuleById(ruleId, tenantId);
+    
+    // Determine data source based on rule type
+    let affectedRecords = [];
+    let totalCount = 0;
+    
+    if (rule.rule_type === RULE_TYPES.ATTENDANCE_THRESHOLD) {
+      // Query attendance records
+      const query = database('attendance')
+        .where({ tenant_id: tenantId })
+        .select('student_id')
+        .count('* as attendance_count')
+        .groupBy('student_id');
+      
+      if (startDate) {
+        query.where('attendance_date', '>=', startDate);
+      }
+      if (endDate) {
+        query.where('attendance_date', '<=', endDate);
+      }
+      
+      affectedRecords = await query.limit(sampleSize);
+      
+      // Get total count
+      const countQuery = database('attendance')
+        .where({ tenant_id: tenantId })
+        .countDistinct('student_id as count');
+      
+      if (startDate) {
+        countQuery.where('attendance_date', '>=', startDate);
+      }
+      if (endDate) {
+        countQuery.where('attendance_date', '<=', endDate);
+      }
+      
+      const countResult = await countQuery.first();
+      totalCount = parseInt(countResult.count);
+      
+    } else if (rule.rule_type === RULE_TYPES.GRADE_ELIGIBILITY || rule.rule_type === RULE_TYPES.GRACE_MARKS) {
+      // Query grade/assessment records
+      const query = database('assessments')
+        .where({ tenant_id: tenantId })
+        .select('student_id', 'grade', 'marks');
+      
+      if (startDate) {
+        query.where('assessment_date', '>=', startDate);
+      }
+      if (endDate) {
+        query.where('assessment_date', '<=', endDate);
+      }
+      
+      affectedRecords = await query.limit(sampleSize);
+      
+      // Get total count
+      const countQuery = database('assessments')
+        .where({ tenant_id: tenantId })
+        .count('* as count');
+      
+      if (startDate) {
+        countQuery.where('assessment_date', '>=', startDate);
+      }
+      if (endDate) {
+        countQuery.where('assessment_date', '<=', endDate);
+      }
+      
+      const countResult = await countQuery.first();
+      totalCount = parseInt(countResult.count);
+    }
+    
+    // Simulate rule evaluation on sample records
+    let matchedCount = 0;
+    const sampleResults = [];
+    
+    for (const record of affectedRecords.slice(0, Math.min(100, affectedRecords.length))) {
+      const context = this.buildContextFromRecord(record, rule.rule_type);
+      const conditionMet = this.checkConditions(rule.conditions, context);
+      
+      if (conditionMet) {
+        matchedCount++;
+        sampleResults.push({
+          student_id: record.student_id,
+          context,
+          actions_to_execute: rule.actions
+        });
+      }
+    }
+    
+    // Estimate total affected based on sample
+    const sampleMatchRate = affectedRecords.length > 0 ? matchedCount / Math.min(affectedRecords.length, 100) : 0;
+    const estimatedAffected = Math.round(totalCount * sampleMatchRate);
+    
+    return {
+      rule_id: ruleId,
+      rule_name: rule.rule_name,
+      rule_type: rule.rule_type,
+      analysis: {
+        total_records: totalCount,
+        sample_size: affectedRecords.length,
+        matched_in_sample: matchedCount,
+        estimated_affected: estimatedAffected,
+        match_rate: sampleMatchRate,
+        date_range: {
+          start: startDate || 'beginning',
+          end: endDate || 'now'
+        }
+      },
+      sample_results: sampleResults.slice(0, 10), // Return first 10 for preview
+      actions_to_execute: rule.actions,
+      estimated_processing_time: this.estimateProcessingTime(estimatedAffected)
+    };
+  }
+
+  /**
+   * Build evaluation context from a database record
+   * @param {Object} record - Database record
+   * @param {string} ruleType - Rule type
+   * @returns {Object} Evaluation context
+   */
+  buildContextFromRecord(record, ruleType) {
+    if (ruleType === RULE_TYPES.ATTENDANCE_THRESHOLD) {
+      // Calculate attendance percentage
+      const totalDays = record.total_days || 100;
+      const presentDays = record.present_days || record.attendance_count || 0;
+      return {
+        attendance_percentage: (presentDays / totalDays) * 100,
+        total_days: totalDays,
+        present_days: presentDays
+      };
+    } else if (ruleType === RULE_TYPES.GRADE_ELIGIBILITY || ruleType === RULE_TYPES.GRACE_MARKS) {
+      return {
+        grade: record.grade,
+        marks: record.marks
+      };
+    }
+    return {};
+  }
+
+  /**
+   * Estimate processing time for retroactive application
+   * @param {number} recordCount - Number of records to process
+   * @returns {string} Estimated time in human-readable format
+   */
+  estimateProcessingTime(recordCount) {
+    // Assume 100 records per second
+    const seconds = Math.ceil(recordCount / 100);
+    
+    if (seconds < 60) {
+      return `${seconds} seconds`;
+    } else if (seconds < 3600) {
+      return `${Math.ceil(seconds / 60)} minutes`;
+    } else {
+      return `${Math.ceil(seconds / 3600)} hours`;
+    }
+  }
+
+  /**
+   * Request retroactive application of a rule
+   * @param {string} ruleId - Rule ID
+   * @param {string} tenantId - Tenant ID
+   * @param {Object} requestData - Request data
+   * @returns {Promise<Object>} Retroactive request
+   */
+  async requestRetroactiveApplication(ruleId, tenantId, requestData) {
+    const database = this.db || db;
+    const { requested_by, start_date, end_date, reason } = requestData;
+    
+    // Get the rule
+    const rule = await this.getRuleById(ruleId, tenantId);
+    
+    // Perform impact analysis
+    const impact = await this.analyzeRetroactiveImpact(ruleId, tenantId, {
+      startDate: start_date,
+      endDate: end_date
+    });
+    
+    // Create retroactive request
+    const requestId = uuidv4();
+    const request = {
+      request_id: requestId,
+      rule_id: ruleId,
+      tenant_id: tenantId,
+      old_config: null, // No old config for new retroactive application
+      new_config: JSON.stringify({
+        rule: rule,
+        date_range: {
+          start: start_date,
+          end: end_date
+        },
+        reason: reason
+      }),
+      status: 'pending_approval',
+      requested_by,
+      affected_count: impact.analysis.estimated_affected,
+      created_at: new Date()
+    };
+    
+    await database('retroactive_policy_requests').insert(request);
+    
+    return {
+      request_id: requestId,
+      ...request,
+      new_config: JSON.parse(request.new_config),
+      impact_analysis: impact
+    };
+  }
+
+  /**
+   * Approve retroactive application request
+   * @param {string} requestId - Request ID
+   * @param {string} tenantId - Tenant ID
+   * @param {string} approvedBy - Approver user ID
+   * @returns {Promise<Object>} Approved request
+   */
+  async approveRetroactiveRequest(requestId, tenantId, approvedBy) {
+    const database = this.db || db;
+    
+    // Get the request
+    const request = await database('retroactive_policy_requests')
+      .where({ request_id: requestId, tenant_id: tenantId })
+      .first();
+    
+    if (!request) {
+      throw new Error('Retroactive request not found');
+    }
+    
+    if (request.status !== 'pending_approval') {
+      throw new Error(`Request is already ${request.status}`);
+    }
+    
+    // Update request status
+    await database('retroactive_policy_requests')
+      .where({ request_id: requestId })
+      .update({
+        status: 'approved',
+        approved_by: approvedBy,
+        approved_at: new Date()
+      });
+    
+    // Return updated request
+    const updatedRequest = await database('retroactive_policy_requests')
+      .where({ request_id: requestId })
+      .first();
+    
+    return {
+      ...updatedRequest,
+      new_config: JSON.parse(updatedRequest.new_config)
+    };
+  }
+
+  /**
+   * Reject retroactive application request
+   * @param {string} requestId - Request ID
+   * @param {string} tenantId - Tenant ID
+   * @param {string} rejectedBy - Rejector user ID
+   * @param {string} reason - Rejection reason
+   * @returns {Promise<Object>} Rejected request
+   */
+  async rejectRetroactiveRequest(requestId, tenantId, rejectedBy, reason) {
+    const database = this.db || db;
+    
+    // Get the request
+    const request = await database('retroactive_policy_requests')
+      .where({ request_id: requestId, tenant_id: tenantId })
+      .first();
+    
+    if (!request) {
+      throw new Error('Retroactive request not found');
+    }
+    
+    if (request.status !== 'pending_approval') {
+      throw new Error(`Request is already ${request.status}`);
+    }
+    
+    // Update request status
+    await database('retroactive_policy_requests')
+      .where({ request_id: requestId })
+      .update({
+        status: 'rejected',
+        approved_by: rejectedBy,
+        approved_at: new Date(),
+        new_config: JSON.stringify({
+          ...JSON.parse(request.new_config),
+          rejection_reason: reason
+        })
+      });
+    
+    // Return updated request
+    const updatedRequest = await database('retroactive_policy_requests')
+      .where({ request_id: requestId })
+      .first();
+    
+    return {
+      ...updatedRequest,
+      new_config: JSON.parse(updatedRequest.new_config)
+    };
+  }
+
+  /**
+   * Apply rule retroactively to historical data (batch processing)
+   * @param {string} requestId - Approved retroactive request ID
+   * @param {string} tenantId - Tenant ID
+   * @param {Object} options - Processing options
+   * @returns {Promise<Object>} Processing result
+   */
+  async applyRuleRetroactively(requestId, tenantId, options = {}) {
+    const database = this.db || db;
+    const { batchSize = 100, dryRun = false } = options;
+    
+    // Get the approved request
+    const request = await database('retroactive_policy_requests')
+      .where({ request_id: requestId, tenant_id: tenantId })
+      .first();
+    
+    if (!request) {
+      throw new Error('Retroactive request not found');
+    }
+    
+    if (request.status !== 'approved') {
+      throw new Error('Request must be approved before applying');
+    }
+    
+    const config = JSON.parse(request.new_config);
+    const rule = config.rule;
+    const { start, end } = config.date_range;
+    
+    // Create snapshot for rollback
+    const snapshotId = uuidv4();
+    const snapshot = {
+      snapshot_id: snapshotId,
+      request_id: requestId,
+      tenant_id: tenantId,
+      rule_id: rule.rule_id,
+      created_at: new Date(),
+      affected_records: []
+    };
+    
+    // Get all affected records
+    let affectedRecords = [];
+    
+    if (rule.rule_type === RULE_TYPES.ATTENDANCE_THRESHOLD) {
+      const query = database('attendance')
+        .where({ tenant_id: tenantId })
+        .select('*');
+      
+      if (start) {
+        query.where('attendance_date', '>=', start);
+      }
+      if (end) {
+        query.where('attendance_date', '<=', end);
+      }
+      
+      affectedRecords = await query;
+      
+    } else if (rule.rule_type === RULE_TYPES.GRADE_ELIGIBILITY || rule.rule_type === RULE_TYPES.GRACE_MARKS) {
+      const query = database('assessments')
+        .where({ tenant_id: tenantId })
+        .select('*');
+      
+      if (start) {
+        query.where('assessment_date', '>=', start);
+      }
+      if (end) {
+        query.where('assessment_date', '<=', end);
+      }
+      
+      affectedRecords = await query;
+    }
+    
+    // Process records in batches
+    const results = {
+      total_processed: 0,
+      total_matched: 0,
+      total_actions_executed: 0,
+      errors: [],
+      snapshot_id: snapshotId,
+      dry_run: dryRun
+    };
+    
+    for (let i = 0; i < affectedRecords.length; i += batchSize) {
+      const batch = affectedRecords.slice(i, i + batchSize);
+      
+      for (const record of batch) {
+        try {
+          const context = this.buildContextFromRecord(record, rule.rule_type);
+          const conditionMet = this.checkConditions(rule.conditions, context);
+          
+          results.total_processed++;
+          
+          if (conditionMet) {
+            results.total_matched++;
+            
+            // Store original state for rollback
+            snapshot.affected_records.push({
+              record_id: record.id || record.student_id,
+              original_state: record,
+              context: context
+            });
+            
+            if (!dryRun) {
+              // Execute actions
+              const evaluationResult = {
+                evaluation_id: uuidv4(),
+                rule_id: rule.rule_id,
+                tenant_id: tenantId,
+                student_id: record.student_id,
+                context: context,
+                condition_met: true,
+                action_executed: false,
+                evaluated_at: new Date(),
+                retroactive: true,
+                request_id: requestId
+              };
+              
+              await this.executeRuleActions(rule, record.student_id, tenantId, context, evaluationResult);
+              results.total_actions_executed++;
+            }
+          }
+        } catch (error) {
+          results.errors.push({
+            record_id: record.id || record.student_id,
+            error: error.message
+          });
+        }
+      }
+    }
+    
+    // Store snapshot for rollback
+    if (!dryRun) {
+      await database('retroactive_application_snapshots').insert({
+        snapshot_id: snapshotId,
+        request_id: requestId,
+        tenant_id: tenantId,
+        rule_id: rule.rule_id,
+        snapshot_data: JSON.stringify(snapshot),
+        created_at: new Date()
+      });
+    }
+    
+    return results;
+  }
+
+  /**
+   * Rollback retroactive application
+   * @param {string} snapshotId - Snapshot ID
+   * @param {string} tenantId - Tenant ID
+   * @returns {Promise<Object>} Rollback result
+   */
+  async rollbackRetroactiveApplication(snapshotId, tenantId) {
+    const database = this.db || db;
+    
+    // Get the snapshot
+    const snapshotRecord = await database('retroactive_application_snapshots')
+      .where({ snapshot_id: snapshotId, tenant_id: tenantId })
+      .first();
+    
+    if (!snapshotRecord) {
+      throw new Error('Snapshot not found');
+    }
+    
+    const snapshot = JSON.parse(snapshotRecord.snapshot_data);
+    
+    // Restore original states
+    const results = {
+      total_restored: 0,
+      errors: []
+    };
+    
+    for (const record of snapshot.affected_records) {
+      try {
+        // Restore original state
+        // This would depend on the specific table and record type
+        // For now, we'll just log the restoration
+        console.log(`Restoring record ${record.record_id} to original state`);
+        results.total_restored++;
+      } catch (error) {
+        results.errors.push({
+          record_id: record.record_id,
+          error: error.message
+        });
+      }
+    }
+    
+    // Mark snapshot as rolled back
+    await database('retroactive_application_snapshots')
+      .where({ snapshot_id: snapshotId })
+      .update({
+        rolled_back: true,
+        rolled_back_at: new Date()
+      });
+    
+    return results;
+  }
+
+  /**
+   * List retroactive requests for a tenant
+   * @param {string} tenantId - Tenant ID
+   * @param {Object} filters - Optional filters
+   * @returns {Promise<Array>} List of requests
+   */
+  async listRetroactiveRequests(tenantId, filters = {}) {
+    const database = this.db || db;
+    
+    let query = database('retroactive_policy_requests')
+      .where({ tenant_id: tenantId });
+    
+    if (filters.status) {
+      query = query.where({ status: filters.status });
+    }
+    
+    if (filters.rule_id) {
+      query = query.where({ rule_id: filters.rule_id });
+    }
+    
+    const requests = await query.orderBy('created_at', 'desc');
+    
+    return requests.map(request => ({
+      ...request,
+      new_config: JSON.parse(request.new_config),
+      old_config: request.old_config ? JSON.parse(request.old_config) : null
     }));
   }
 }

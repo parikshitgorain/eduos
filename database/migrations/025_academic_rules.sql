@@ -200,6 +200,43 @@ CREATE POLICY retroactive_requests_tenant_isolation ON retroactive_policy_reques
     USING (tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID);
 
 -- ============================================================================
+-- RETROACTIVE APPLICATION SNAPSHOTS TABLE
+-- ============================================================================
+-- Stores snapshots of data before retroactive application for rollback
+
+CREATE TABLE IF NOT EXISTS retroactive_application_snapshots (
+    snapshot_id UUID PRIMARY KEY,
+    request_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
+    rule_id UUID NOT NULL,
+    snapshot_data JSONB NOT NULL, -- Contains affected records and their original states
+    rolled_back BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    rolled_back_at TIMESTAMP,
+    
+    -- Constraints
+    CONSTRAINT fk_retroactive_snapshots_request FOREIGN KEY (request_id) 
+        REFERENCES retroactive_policy_requests(request_id) ON DELETE CASCADE,
+    CONSTRAINT fk_retroactive_snapshots_tenant FOREIGN KEY (tenant_id) 
+        REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    CONSTRAINT fk_retroactive_snapshots_rule FOREIGN KEY (rule_id) 
+        REFERENCES academic_rules(rule_id) ON DELETE CASCADE
+);
+
+-- Indexes
+CREATE INDEX idx_retroactive_snapshots_request ON retroactive_application_snapshots(request_id);
+CREATE INDEX idx_retroactive_snapshots_tenant ON retroactive_application_snapshots(tenant_id);
+CREATE INDEX idx_retroactive_snapshots_rule ON retroactive_application_snapshots(rule_id);
+CREATE INDEX idx_retroactive_snapshots_rolled_back ON retroactive_application_snapshots(rolled_back);
+
+-- RLS
+ALTER TABLE retroactive_application_snapshots ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY retroactive_snapshots_tenant_isolation ON retroactive_application_snapshots
+    FOR ALL
+    USING (tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID);
+
+-- ============================================================================
 -- FUNCTIONS
 -- ============================================================================
 
@@ -233,6 +270,7 @@ COMMENT ON TABLE rule_evaluations IS 'Audit log of all rule evaluations';
 COMMENT ON TABLE rule_overrides IS 'Manual overrides of rule decisions with configurable approval workflow';
 COMMENT ON TABLE rule_override_audit IS 'Audit trail of all actions taken on override requests';
 COMMENT ON TABLE retroactive_policy_requests IS 'Requests to apply policy changes retroactively';
+COMMENT ON TABLE retroactive_application_snapshots IS 'Snapshots of data before retroactive application for rollback capability';
 
 COMMENT ON COLUMN academic_rules.conditions IS 'Array of condition objects: [{field, operator, value}]';
 COMMENT ON COLUMN academic_rules.actions IS 'Array of action objects: [{type, parameters}]';
@@ -244,3 +282,6 @@ COMMENT ON COLUMN rule_overrides.approval_chain IS 'Array of roles defining appr
 COMMENT ON COLUMN rule_overrides.current_approval_level IS 'Current position in approval chain (0-indexed)';
 COMMENT ON COLUMN rule_overrides.approvals IS 'Array of approval records with timestamps and reasons';
 COMMENT ON COLUMN rule_overrides.supporting_documents IS 'Array of document metadata supporting the override request';
+
+COMMENT ON COLUMN retroactive_application_snapshots.snapshot_data IS 'Contains affected records and their original states for rollback';
+COMMENT ON COLUMN retroactive_application_snapshots.rolled_back IS 'Indicates if this snapshot has been used for rollback';

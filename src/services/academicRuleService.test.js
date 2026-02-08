@@ -5,6 +5,30 @@
 const academicRuleService = require('./academicRuleService');
 const { RULE_TYPES, ACTION_TYPES } = require('./academicRuleService');
 
+// Mock the database module
+jest.mock('../config/database', () => {
+  const mockQuery = {
+    where: jest.fn().mockReturnThis(),
+    whereNull: jest.fn().mockReturnThis(),
+    whereNot: jest.fn().mockReturnThis(),
+    orWhere: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    offset: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    first: jest.fn().mockResolvedValue(null),
+    insert: jest.fn().mockResolvedValue([]),
+    update: jest.fn().mockResolvedValue([])
+  };
+
+  const mockDb = jest.fn(() => mockQuery);
+  Object.assign(mockDb, mockQuery);
+  
+  return mockDb;
+});
+
+const db = require('../config/database');
+
 describe('AcademicRuleService - Validation', () => {
   const mockTenantId = 'tenant-123';
   const mockUserId = 'user-456';
@@ -1276,14 +1300,16 @@ describe('AcademicRuleService - Complete Branch Coverage', () => {
 
       const getRuleQuery = {
         where: jest.fn().mockReturnThis(),
-        first: jest.fn()
-          .mockResolvedValueOnce(existingRule)
-          .mockResolvedValueOnce(existingRule)
+        first: jest.fn().mockResolvedValue(existingRule)
       };
 
       const updateQuery = {
         where: jest.fn().mockReturnThis(),
         update: jest.fn().mockResolvedValue([])
+      };
+
+      const redisDelQuery = {
+        del: jest.fn().mockResolvedValue(1)
       };
 
       let callCount = 0;
@@ -1310,7 +1336,8 @@ describe('AcademicRuleService - Complete Branch Coverage', () => {
   describe('evaluateRulesForStudent - error handling', () => {
     it('should handle errors during rule evaluation', async () => {
       const academicRulesQuery = {
-        where: jest.fn().mockRejectedValue(new Error('Database error'))
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockRejectedValue(new Error('Database error'))
       };
 
       mockDb.mockImplementation(() => academicRulesQuery);
@@ -1626,7 +1653,8 @@ describe('AcademicRuleService - Complete Branch Coverage', () => {
         where: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         limit: jest.fn().mockReturnThis(),
-        offset: jest.fn().mockResolvedValue(mockEvaluations)
+        offset: jest.fn().mockReturnThis(),
+        then: jest.fn((resolve) => resolve(mockEvaluations))
       };
 
       mockDb.mockImplementation(() => evaluationsQuery);
@@ -1638,7 +1666,468 @@ describe('AcademicRuleService - Complete Branch Coverage', () => {
       );
 
       expect(history).toHaveLength(1);
+      // Check that where was called twice - once for student/tenant, once for ruleId
+      expect(evaluationsQuery.where).toHaveBeenCalledTimes(2);
       expect(evaluationsQuery.where).toHaveBeenCalledWith({ rule_id: 'rule-1' });
+    });
+  });
+});
+
+
+describe('AcademicRuleService - CRUD Operations Coverage', () => {
+  const mockTenantId = 'tenant-123';
+  const mockUserId = 'user-789';
+
+  let mockDb;
+  let mockRedis;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    
+    const mockQuery = {
+      where: jest.fn().mockReturnThis(),
+      whereNull: jest.fn().mockReturnThis(),
+      whereNot: jest.fn().mockReturnThis(),
+      orWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      offset: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      first: jest.fn().mockResolvedValue(null),
+      insert: jest.fn().mockResolvedValue([]),
+      update: jest.fn().mockResolvedValue([])
+    };
+
+    mockDb = jest.fn(() => mockQuery);
+    Object.assign(mockDb, mockQuery);
+    
+    mockRedis = {
+      get: jest.fn().mockResolvedValue(null),
+      setex: jest.fn().mockResolvedValue('OK'),
+      del: jest.fn().mockResolvedValue(1)
+    };
+
+    academicRuleService.initialize(mockDb, mockRedis);
+  });
+
+  describe('createRule - complete flow', () => {
+    it('should create rule with all optional fields', async () => {
+      // Mock checkRuleConflicts to return no conflicts
+      const conflictQuery = {
+        where: jest.fn().mockReturnThis(),
+        whereNull: jest.fn().mockReturnThis(),
+        orWhere: jest.fn().mockReturnThis(),
+        then: jest.fn((resolve) => resolve([]))
+      };
+
+      // Mock insert
+      const insertQuery = {
+        insert: jest.fn().mockResolvedValue([])
+      };
+
+      let callCount = 0;
+      mockDb.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return conflictQuery;
+        return insertQuery;
+      });
+
+      const ruleConfig = {
+        tenant_id: mockTenantId,
+        name: 'Complete Rule',
+        type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: [{ field: 'attendance_percentage', operator: '<', value: 75 }],
+        actions: [{ type: ACTION_TYPES.SET_ELIGIBILITY, eligible: false }],
+        priority: 200,
+        effective_from: new Date('2026-01-01'),
+        effective_until: new Date('2026-12-31'),
+        created_by: mockUserId
+      };
+
+      const rule = await academicRuleService.createRule(ruleConfig);
+
+      expect(rule).toBeDefined();
+      expect(rule.rule_id).toBeDefined();
+      expect(rule.priority).toBe(200);
+    });
+
+    it('should create rule with default priority and effective_from', async () => {
+      // Mock checkRuleConflicts
+      const conflictQuery = {
+        where: jest.fn().mockReturnThis(),
+        whereNull: jest.fn().mockReturnThis(),
+        orWhere: jest.fn().mockReturnThis(),
+        then: jest.fn((resolve) => resolve([]))
+      };
+
+      // Mock insert
+      const insertQuery = {
+        insert: jest.fn().mockResolvedValue([])
+      };
+
+      let callCount = 0;
+      mockDb.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return conflictQuery;
+        return insertQuery;
+      });
+
+      const ruleConfig = {
+        tenant_id: mockTenantId,
+        name: 'Default Values Rule',
+        type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: [{ field: 'attendance_percentage', operator: '<', value: 75 }],
+        actions: [{ type: ACTION_TYPES.SET_ELIGIBILITY, eligible: false }],
+        created_by: mockUserId
+      };
+
+      const rule = await academicRuleService.createRule(ruleConfig);
+
+      expect(rule).toBeDefined();
+      expect(rule.priority).toBe(100); // Default priority
+    });
+  });
+
+  describe('listRules - with filters', () => {
+    it('should list rules with type filter', async () => {
+      const mockRules = [
+        {
+          rule_id: 'rule-1',
+          tenant_id: mockTenantId,
+          rule_name: 'Rule 1',
+          rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+          conditions: JSON.stringify([{ field: 'attendance', operator: '<', value: 75 }]),
+          actions: JSON.stringify([{ type: ACTION_TYPES.SET_ELIGIBILITY, eligible: false }]),
+          status: 'active'
+        }
+      ];
+
+      const whereChain = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        then: jest.fn((resolve) => resolve(mockRules))
+      };
+
+      mockDb.mockImplementation(() => whereChain);
+
+      const rules = await academicRuleService.listRules(mockTenantId, {
+        type: RULE_TYPES.ATTENDANCE_THRESHOLD
+      });
+
+      expect(rules).toHaveLength(1);
+    });
+
+    it('should list rules with status filter', async () => {
+      const mockRules = [];
+
+      const whereChain = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        then: jest.fn((resolve) => resolve(mockRules))
+      };
+
+      mockDb.mockImplementation(() => whereChain);
+
+      const rules = await academicRuleService.listRules(mockTenantId, {
+        status: 'inactive'
+      });
+
+      expect(rules).toHaveLength(0);
+    });
+
+    it('should list active rules only with active_only filter', async () => {
+      const mockRules = [];
+
+      const whereChain = {
+        where: jest.fn().mockReturnThis(),
+        whereNull: jest.fn().mockReturnThis(),
+        orWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        then: jest.fn((resolve) => resolve(mockRules))
+      };
+
+      mockDb.mockImplementation(() => whereChain);
+
+      const rules = await academicRuleService.listRules(mockTenantId, {
+        active_only: true
+      });
+
+      expect(rules).toHaveLength(0);
+    });
+  });
+
+  describe('updateRule - conflict checking', () => {
+    it('should check for conflicts when updating conditions', async () => {
+      const existingRule = {
+        rule_id: 'rule-123',
+        tenant_id: mockTenantId,
+        rule_name: 'Test Rule',
+        rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: JSON.stringify([{ field: 'attendance_percentage', operator: '<', value: 75 }]),
+        actions: JSON.stringify([{ type: ACTION_TYPES.SET_ELIGIBILITY, eligible: false }]),
+        status: 'active'
+      };
+
+      const conflictingRule = {
+        rule_id: 'rule-456',
+        tenant_id: mockTenantId,
+        rule_name: 'Conflicting Rule',
+        rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: JSON.stringify([{ field: 'attendance_percentage', operator: '<', value: 80 }]),
+        actions: JSON.stringify([{ type: ACTION_TYPES.SET_ELIGIBILITY, eligible: false }]),
+        status: 'active'
+      };
+
+      const getRuleQuery = {
+        where: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue(existingRule)
+      };
+
+      const conflictQuery = {
+        where: jest.fn().mockReturnThis(),
+        whereNot: jest.fn().mockReturnThis(),
+        then: jest.fn((resolve) => resolve([conflictingRule]))
+      };
+
+      let callCount = 0;
+      mockDb.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return getRuleQuery;
+        return conflictQuery;
+      });
+
+      const updates = {
+        conditions: [{ field: 'attendance_percentage', operator: '<', value: 80 }]
+      };
+
+      await expect(
+        academicRuleService.updateRule('rule-123', mockTenantId, updates)
+      ).rejects.toThrow('Updated rule would conflict');
+    });
+
+    it('should update rule when no conflicts exist', async () => {
+      const existingRule = {
+        rule_id: 'rule-123',
+        tenant_id: mockTenantId,
+        rule_name: 'Test Rule',
+        rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: JSON.stringify([{ field: 'attendance_percentage', operator: '<', value: 75 }]),
+        actions: JSON.stringify([{ type: ACTION_TYPES.SET_ELIGIBILITY, eligible: false }]),
+        status: 'active'
+      };
+
+      const getRuleQuery = {
+        where: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue(existingRule)
+      };
+
+      const conflictQuery = {
+        where: jest.fn().mockReturnThis(),
+        whereNot: jest.fn().mockReturnThis(),
+        then: jest.fn((resolve) => resolve([])) // No conflicts
+      };
+
+      const updateQuery = {
+        where: jest.fn().mockReturnThis(),
+        update: jest.fn().mockResolvedValue([])
+      };
+
+      let callCount = 0;
+      mockDb.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1 || callCount === 4) return getRuleQuery;
+        if (callCount === 2) return conflictQuery;
+        if (callCount === 3) return updateQuery;
+        return getRuleQuery;
+      });
+
+      const updates = {
+        conditions: [{ field: 'attendance_percentage', operator: '<', value: 70 }]
+      };
+
+      const updatedRule = await academicRuleService.updateRule('rule-123', mockTenantId, updates);
+
+      expect(updatedRule).toBeDefined();
+      expect(updateQuery.update).toHaveBeenCalled();
+    });
+
+    it('should update rule without checking conflicts when conditions not updated', async () => {
+      const existingRule = {
+        rule_id: 'rule-123',
+        tenant_id: mockTenantId,
+        rule_name: 'Test Rule',
+        rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: JSON.stringify([{ field: 'attendance_percentage', operator: '<', value: 75 }]),
+        actions: JSON.stringify([{ type: ACTION_TYPES.SET_ELIGIBILITY, eligible: false }]),
+        status: 'active'
+      };
+
+      const getRuleQuery = {
+        where: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue(existingRule)
+      };
+
+      const updateQuery = {
+        where: jest.fn().mockReturnThis(),
+        update: jest.fn().mockResolvedValue([])
+      };
+
+      let callCount = 0;
+      mockDb.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1 || callCount === 3) return getRuleQuery;
+        return updateQuery;
+      });
+
+      const updates = {
+        rule_name: 'Updated Name'
+      };
+
+      const updatedRule = await academicRuleService.updateRule('rule-123', mockTenantId, updates);
+
+      expect(updatedRule).toBeDefined();
+      expect(updateQuery.update).toHaveBeenCalled();
+    });
+  });
+
+  describe('deactivateRule and deleteRule', () => {
+    it('should deactivate a rule', async () => {
+      const existingRule = {
+        rule_id: 'rule-123',
+        tenant_id: mockTenantId,
+        rule_name: 'Test Rule',
+        rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: JSON.stringify([{ field: 'attendance_percentage', operator: '<', value: 75 }]),
+        actions: JSON.stringify([{ type: ACTION_TYPES.SET_ELIGIBILITY, eligible: false }]),
+        status: 'inactive'
+      };
+
+      const updateQuery = {
+        where: jest.fn().mockReturnThis(),
+        update: jest.fn().mockResolvedValue([])
+      };
+
+      const getRuleQuery = {
+        where: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue(existingRule)
+      };
+
+      let callCount = 0;
+      mockDb.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return updateQuery;
+        return getRuleQuery;
+      });
+
+      const deactivatedRule = await academicRuleService.deactivateRule('rule-123', mockTenantId);
+
+      expect(deactivatedRule).toBeDefined();
+      expect(updateQuery.update).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'inactive' })
+      );
+    });
+
+    it('should delete a rule (soft delete)', async () => {
+      const updateQuery = {
+        where: jest.fn().mockReturnThis(),
+        update: jest.fn().mockResolvedValue([])
+      };
+
+      mockDb.mockImplementation(() => updateQuery);
+
+      await academicRuleService.deleteRule('rule-123', mockTenantId);
+
+      expect(updateQuery.update).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'deleted' })
+      );
+    });
+  });
+
+  describe('checkRuleConflicts - with effective_until', () => {
+    it('should check conflicts with rules that have effective_until in future', async () => {
+      const futureDate = new Date();
+      futureDate.setFullYear(futureDate.getFullYear() + 1);
+
+      const existingRule = {
+        rule_id: 'rule-existing',
+        tenant_id: mockTenantId,
+        rule_name: 'Existing Rule',
+        rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+        conditions: JSON.stringify([{ field: 'attendance_percentage', operator: '<', value: 75 }]),
+        actions: JSON.stringify([{ type: ACTION_TYPES.SET_ELIGIBILITY, eligible: false }]),
+        status: 'active',
+        effective_until: futureDate
+      };
+
+      const conflictQuery = {
+        where: jest.fn().mockReturnThis(),
+        whereNull: jest.fn().mockReturnThis(),
+        orWhere: jest.fn().mockReturnThis(),
+        then: jest.fn((resolve) => resolve([existingRule]))
+      };
+
+      mockDb.mockImplementation(() => conflictQuery);
+
+      const newConditions = [{ field: 'attendance_percentage', operator: '<', value: 75 }];
+
+      await expect(
+        academicRuleService.checkRuleConflicts(mockTenantId, RULE_TYPES.ATTENDANCE_THRESHOLD, newConditions)
+      ).rejects.toThrow('Rule conflicts with existing rule');
+    });
+
+    it('should not throw when no conflicts exist', async () => {
+      const conflictQuery = {
+        where: jest.fn().mockReturnThis(),
+        whereNull: jest.fn().mockReturnThis(),
+        orWhere: jest.fn().mockReturnThis(),
+        then: jest.fn((resolve) => resolve([])) // No existing rules
+      };
+
+      mockDb.mockImplementation(() => conflictQuery);
+
+      const newConditions = [{ field: 'attendance_percentage', operator: '<', value: 75 }];
+
+      await expect(
+        academicRuleService.checkRuleConflicts(mockTenantId, RULE_TYPES.ATTENDANCE_THRESHOLD, newConditions)
+      ).resolves.not.toThrow();
+    });
+  });
+
+  describe('getApplicableRules - date filtering', () => {
+    it('should filter rules by effective_from and effective_until dates', async () => {
+      const now = new Date();
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - 10);
+
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 10);
+
+      const mockRules = [
+        {
+          rule_id: 'rule-1',
+          tenant_id: mockTenantId,
+          rule_name: 'Active Rule',
+          rule_type: RULE_TYPES.ATTENDANCE_THRESHOLD,
+          conditions: JSON.stringify([{ field: 'attendance_percentage', operator: '<', value: 75 }]),
+          actions: JSON.stringify([{ type: ACTION_TYPES.SET_ELIGIBILITY, eligible: false }]),
+          status: 'active',
+          effective_from: pastDate,
+          effective_until: futureDate
+        }
+      ];
+
+      const rulesQuery = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockResolvedValue(mockRules)
+      };
+
+      mockDb.mockImplementation(() => rulesQuery);
+
+      const context = { attendance_percentage: 70 };
+      const rules = await academicRuleService.getApplicableRules(mockTenantId, context);
+
+      expect(rules).toHaveLength(1);
+      expect(rulesQuery.where).toHaveBeenCalledWith('effective_from', '<=', expect.any(Date));
     });
   });
 });

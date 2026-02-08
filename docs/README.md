@@ -238,6 +238,7 @@ eduos-platform/
 | [Task 5.1.1](tasks/TASK_5.1.1_IMPLEMENTATION_SUMMARY.md) | Rule configuration engine implementation | Developers |
 | [Task 5.1.2](tasks/TASK_5.1.2_IMPLEMENTATION_SUMMARY.md) | Real-time rule evaluation implementation | Developers |
 | [Task 5.1.3](tasks/TASK_5.1.3_IMPLEMENTATION_SUMMARY.md) | Rule override workflow implementation | Developers |
+| [Task 5.1.4](tasks/TASK_5.1.4_IMPLEMENTATION_SUMMARY.md) | Prospective vs retroactive application implementation | Developers |
 
 ### 11. Audit & Compliance Documentation
 
