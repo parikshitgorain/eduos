@@ -8,7 +8,7 @@ import type { Tenant } from '../services/tenantService';
  */
 export interface TenantSelectorProps {
   value: string | null;
-  onChange: (tenantId: string, tenantName: string) => void;
+  onChange: (tenantId: string, tenantName: string, contactInfo?: { email?: string; phone?: string }) => void;
   error?: string;
   disabled?: boolean;
 }
@@ -17,13 +17,12 @@ export interface TenantSelectorProps {
  * TenantSelector Component
  * Searchable dropdown for institution selection with debounced API calls
  */
-export function TenantSelector({ value, onChange, error, disabled = false }: TenantSelectorProps) {
+export function TenantSelector({ onChange, error, disabled = false }: TenantSelectorProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Tenant[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -43,7 +42,7 @@ export function TenantSelector({ value, onChange, error, disabled = false }: Ten
         setResults(tenants);
         setIsOpen(true);
       } catch (error) {
-        console.error('Tenant search error:', error);
+        // Silently fail and show no results
         setResults([]);
       } finally {
         setIsSearching(false);
@@ -66,10 +65,9 @@ export function TenantSelector({ value, onChange, error, disabled = false }: Ten
   }, []);
 
   const handleSelect = (tenant: Tenant) => {
-    setSelectedTenant(tenant);
     setQuery(tenant.name);
     setIsOpen(false);
-    onChange(tenant.id, tenant.name);
+    onChange(tenant.id, tenant.name, tenant.contactInfo);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -105,7 +103,6 @@ export function TenantSelector({ value, onChange, error, disabled = false }: Ten
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newQuery = e.target.value;
     setQuery(newQuery);
-    setSelectedTenant(null);
     if (newQuery.length >= 2) {
       setIsOpen(true);
     }
@@ -115,9 +112,10 @@ export function TenantSelector({ value, onChange, error, disabled = false }: Ten
     <div className="w-full" ref={dropdownRef}>
       <div className="relative">
         <div className="relative">
-          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" aria-hidden="true" />
           <input
             ref={inputRef}
+            id="tenantId"
             type="text"
             value={query}
             onChange={handleInputChange}
@@ -126,20 +124,23 @@ export function TenantSelector({ value, onChange, error, disabled = false }: Ten
             placeholder="Search for your institution..."
             disabled={disabled}
             aria-label="Search for institution"
+            aria-required="true"
             aria-invalid={!!error}
             aria-describedby={error ? 'tenant-error' : undefined}
             aria-expanded={isOpen}
             aria-autocomplete="list"
             aria-controls="tenant-results"
+            aria-activedescendant={selectedIndex >= 0 ? `tenant-option-${selectedIndex}` : undefined}
+            role="combobox"
             className={`
-              w-full h-12 pl-10 pr-10 rounded-lg border
+              w-full h-12 pl-10 pr-10 rounded-lg border bg-white
               ${error ? 'border-red-500' : 'border-gray-300'}
               focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
               disabled:bg-gray-100 disabled:cursor-not-allowed
               text-gray-900 placeholder-gray-400
             `}
           />
-          <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" aria-hidden="true" />
         </div>
 
         {/* Dropdown results */}
@@ -147,17 +148,19 @@ export function TenantSelector({ value, onChange, error, disabled = false }: Ten
           <div
             id="tenant-results"
             role="listbox"
+            aria-label="Institution search results"
             className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
           >
             {isSearching ? (
-              <div className="px-4 py-3 text-sm text-gray-500 flex items-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
+              <div className="px-4 py-3 text-sm text-gray-500 flex items-center gap-2" role="status" aria-live="polite">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600" aria-hidden="true"></div>
                 Searching...
               </div>
             ) : results.length > 0 ? (
               results.map((tenant, index) => (
                 <button
                   key={tenant.id}
+                  id={`tenant-option-${index}`}
                   type="button"
                   role="option"
                   aria-selected={selectedIndex === index}
@@ -175,11 +178,11 @@ export function TenantSelector({ value, onChange, error, disabled = false }: Ten
                 </button>
               ))
             ) : query.length >= 2 ? (
-              <div className="px-4 py-3 text-sm text-gray-500">
+              <div className="px-4 py-3 text-sm text-gray-500" role="status">
                 No institutions found. Please contact your administrator.
               </div>
             ) : (
-              <div className="px-4 py-3 text-sm text-gray-500">
+              <div className="px-4 py-3 text-sm text-gray-500" role="status">
                 Type at least 2 characters to search
               </div>
             )}

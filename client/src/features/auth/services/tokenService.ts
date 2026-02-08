@@ -83,7 +83,7 @@ class TokenService {
       const session: StoredSession = JSON.parse(sessionData);
       return Date.now() < session.expiresAt;
     } catch (error) {
-      console.error('Error parsing session data:', error);
+      // Invalid session data, treat as expired
       return false;
     }
   }
@@ -104,7 +104,7 @@ class TokenService {
       const session: StoredSession = JSON.parse(sessionData);
       return new Date(session.expiresAt);
     } catch (error) {
-      console.error('Error parsing session data:', error);
+      // Invalid session data
       return null;
     }
   }

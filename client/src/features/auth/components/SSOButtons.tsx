@@ -47,6 +47,8 @@ export function SSOButtons({
         type="button"
         onClick={() => handleSSOClick('google')}
         disabled={isDisabled}
+        aria-label="Sign in with Google"
+        aria-disabled={isDisabled}
         className={`
           w-full h-12 px-4 rounded-lg border border-gray-300
           flex items-center justify-center gap-3
@@ -58,7 +60,6 @@ export function SSOButtons({
               : 'bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
           }
         `}
-        aria-label="Sign in with Google"
       >
         <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
           <path
@@ -86,6 +87,8 @@ export function SSOButtons({
         type="button"
         onClick={() => handleSSOClick('microsoft')}
         disabled={isDisabled}
+        aria-label="Sign in with Microsoft"
+        aria-disabled={isDisabled}
         className={`
           w-full h-12 px-4 rounded-lg border border-gray-300
           flex items-center justify-center gap-3
@@ -97,7 +100,6 @@ export function SSOButtons({
               : 'bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
           }
         `}
-        aria-label="Sign in with Microsoft"
       >
         <svg className="w-5 h-5" viewBox="0 0 23 23" aria-hidden="true">
           <path fill="#f25022" d="M0 0h11v11H0z" />

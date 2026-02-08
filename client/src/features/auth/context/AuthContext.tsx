@@ -60,6 +60,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsLoading(false);
   }, []);
 
+  // Listen for session expiration events
+  useEffect(() => {
+    const handleSessionExpired = (event: Event) => {
+      const customEvent = event as CustomEvent<{ message: string }>;
+      
+      // Clear local state
+      tokenService.clearToken();
+      setToken(null);
+      setUser(null);
+      setError(customEvent.detail.message);
+      
+      // Redirect to login page if not already there
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    };
+
+    window.addEventListener('session-expired', handleSessionExpired);
+
+    return () => {
+      window.removeEventListener('session-expired', handleSessionExpired);
+    };
+  }, []);
+
   /**
    * Login with email and password
    */
@@ -134,7 +158,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       await authService.logout();
     } catch (err) {
-      console.error('Logout error:', err);
       // Continue with local logout even if API call fails
     } finally {
       tokenService.clearToken();

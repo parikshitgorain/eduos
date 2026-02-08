@@ -44,7 +44,6 @@ export function SSOCallbackPage() {
         // Redirect to dashboard
         navigate('/dashboard', { replace: true });
       } catch (err) {
-        console.error('SSO callback error:', err);
         setError('Failed to complete SSO authentication. Please try again.');
       }
     };

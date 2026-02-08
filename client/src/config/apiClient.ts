@@ -64,11 +64,28 @@ function createAPIClient(): AxiosInstance {
         details: error.response.data?.details,
       };
 
-      // Handle 401 Unauthorized - Clear token and redirect to login
+      // Handle 401 Unauthorized - Session expired or invalid token
       if (error.response.status === 401) {
+        // Clear token from localStorage
         localStorage.removeItem('auth_token');
-        // Optionally redirect to login page
-        // window.location.href = '/login';
+        localStorage.removeItem('auth_session');
+        
+        // Store current URL for redirect after login
+        const currentPath = window.location.pathname;
+        if (currentPath !== '/login' && currentPath !== '/mfa' && currentPath !== '/forgot-password') {
+          sessionStorage.setItem('redirect_after_login', currentPath);
+        }
+        
+        // Dispatch custom event for session expiration
+        window.dispatchEvent(new CustomEvent('session-expired', {
+          detail: { message: 'Session expired. Please log in again.' }
+        }));
+        
+        // Return a specific error for session expiration
+        return Promise.reject({
+          code: 'SESSION_EXPIRED',
+          message: 'Session expired. Please log in again.',
+        } as APIError);
       }
 
       return Promise.reject(apiError);

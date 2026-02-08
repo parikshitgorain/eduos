@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Link } from 'react-router-dom';
 import { loginSchema } from '../utils/validationSchemas';
 import type { LoginFormData } from '../utils/validationSchemas';
 import { TenantSelector } from './TenantSelector';
@@ -8,6 +9,9 @@ import { PasswordInput } from './PasswordInput';
 import { ErrorDisplay } from '../../../shared/components/ErrorDisplay';
 import { ButtonLoadingIndicator } from '../../../shared/components/LoadingIndicator';
 import { SSOButtons, type SSOProvider } from './SSOButtons';
+import { CaptchaWidget } from './CaptchaWidget';
+import { ContactAdminLink } from './ContactAdminLink';
+import { focusFirstInvalidField } from '../utils/focusManagement';
 
 /**
  * LoginForm component props
@@ -35,7 +39,8 @@ export function LoginForm({
 }: LoginFormProps) {
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [showCaptcha, setShowCaptcha] = useState(false);
-  const [selectedTenantName, setSelectedTenantName] = useState('');
+  const [selectedTenantName, setSelectedTenantName] = useState<string | null>(null);
+  const [selectedTenantContactInfo, setSelectedTenantContactInfo] = useState<{ email?: string; phone?: string } | undefined>(undefined);
 
   const {
     register,
@@ -43,7 +48,6 @@ export function LoginForm({
     setValue,
     watch,
     formState: { errors, isValid },
-    reset,
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     mode: 'onChange',
@@ -56,18 +60,34 @@ export function LoginForm({
     },
   });
 
-  const tenantId = watch('tenantId');
-  const email = watch('email');
-  const password = watch('password');
-  const rememberMe = watch('rememberMe');
+  // Focus first invalid field when errors change
+  useEffect(() => {
+    if (Object.keys(errors).length > 0) {
+      // Define field order for focus priority
+      const fieldOrder = ['tenantId', 'email', 'password', 'captchaToken'];
+      focusFirstInvalidField(errors, fieldOrder);
+    }
+  }, [errors]);
 
-  const handleTenantChange = (id: string, name: string) => {
+  const tenantId = watch('tenantId');
+  const password = watch('password');
+
+  const handleTenantChange = (id: string, name: string, contactInfo?: { email?: string; phone?: string }) => {
     setValue('tenantId', id, { shouldValidate: true });
     setSelectedTenantName(name);
+    setSelectedTenantContactInfo(contactInfo);
   };
 
   const handlePasswordChange = (value: string) => {
     setValue('password', value, { shouldValidate: true });
+  };
+
+  const handleCaptchaVerify = (token: string) => {
+    setValue('captchaToken', token, { shouldValidate: true });
+  };
+
+  const handleCaptchaExpire = () => {
+    setValue('captchaToken', undefined, { shouldValidate: true });
   };
 
   const handleFormSubmit = async (data: LoginFormData) => {
@@ -103,14 +123,23 @@ export function LoginForm({
     try {
       await onSSOInitiate(provider, tenantId);
     } catch (err) {
-      console.error('SSO initiation failed:', err);
+      // Error will be handled by parent component
     }
   };
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6" noValidate>
+    <form 
+      onSubmit={handleSubmit(handleFormSubmit)} 
+      className="space-y-6" 
+      noValidate
+      aria-label="Login form"
+    >
       {/* Global error message */}
-      {error && <ErrorDisplay message={error} />}
+      {error && (
+        <div role="alert" aria-live="assertive">
+          <ErrorDisplay message={error} />
+        </div>
+      )}
 
       {/* Institution Selection */}
       <div>
@@ -137,14 +166,16 @@ export function LoginForm({
           autoComplete="email"
           disabled={isLoading || !tenantId}
           placeholder="your.email@example.com"
+          aria-label="Email address"
+          aria-required="true"
           aria-invalid={!!errors.email}
           aria-describedby={errors.email ? 'email-error' : undefined}
           className={`
-            w-full h-12 px-4 rounded-lg border
+            w-full h-12 px-4 rounded-lg border bg-white
             ${errors.email ? 'border-red-500' : 'border-gray-300'}
             focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
             disabled:bg-gray-100 disabled:cursor-not-allowed
-            text-gray-900 placeholder-gray-400
+            text-gray-900 placeholder-gray-500
           `}
         />
         {errors.email && (
@@ -160,12 +191,12 @@ export function LoginForm({
           <label htmlFor="password" className="block text-sm font-medium text-gray-700">
             Password
           </label>
-          <a
-            href="/forgot-password"
-            className="text-sm text-primary-600 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded"
+          <Link
+            to="/forgot-password"
+            className="text-sm text-primary-600 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded px-2 py-2 min-h-[44px] inline-flex items-center"
           >
             Forgot password?
-          </a>
+          </Link>
         </div>
         <PasswordInput
           value={password}
@@ -183,37 +214,35 @@ export function LoginForm({
           type="checkbox"
           id="rememberMe"
           disabled={isLoading}
-          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 focus:ring-2"
+          aria-label="Remember me for 30 days"
+          className="w-5 h-5 accent-primary-600 bg-white border-gray-300 rounded focus:ring-primary-500 focus:ring-2 cursor-pointer disabled:cursor-not-allowed"
         />
-        <label htmlFor="rememberMe" className="ml-2 text-sm text-gray-700">
-          Remember me for 30 days
+        <label htmlFor="rememberMe" className="ml-2 text-sm text-gray-700 cursor-pointer select-none">
+          Remember me
         </label>
       </div>
 
       {/* CAPTCHA Widget (shown after 3 failed attempts) */}
       {showCaptcha && (
-        <div className="p-4 bg-gray-50 border border-gray-300 rounded-lg">
-          <p className="text-sm text-gray-700 mb-2">
-            Please complete the CAPTCHA to continue
-          </p>
-          {/* TODO: Integrate actual CAPTCHA widget (reCAPTCHA, hCaptcha, etc.) */}
-          <div className="h-20 bg-gray-200 rounded flex items-center justify-center text-gray-500">
-            CAPTCHA Widget Placeholder
-          </div>
-        </div>
+        <CaptchaWidget
+          onVerify={handleCaptchaVerify}
+          onExpire={handleCaptchaExpire}
+        />
       )}
 
       {/* Submit Button */}
       <button
         type="submit"
         disabled={!isValid || isLoading || (showCaptcha && !watch('captchaToken'))}
+        aria-label={isLoading ? 'Signing in, please wait' : 'Sign in to your account'}
+        aria-disabled={!isValid || isLoading || (showCaptcha && !watch('captchaToken'))}
         className={`
           w-full h-12 rounded-lg font-medium text-white
           flex items-center justify-center gap-2
           transition-colors duration-200
           ${
             !isValid || isLoading || (showCaptcha && !watch('captchaToken'))
-              ? 'bg-gray-400 cursor-not-allowed'
+              ? 'bg-gray-500 cursor-not-allowed'
               : 'bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
           }
         `}
@@ -237,14 +266,11 @@ export function LoginForm({
       />
 
       {/* Contact Administrator Link */}
-      <div className="text-center">
-        <a
-          href="/contact-admin"
-          className="text-sm text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded"
-        >
-          Contact administrator
-        </a>
-      </div>
+      <ContactAdminLink 
+        tenantId={tenantId} 
+        tenantName={selectedTenantName}
+        contactInfo={selectedTenantContactInfo}
+      />
     </form>
   );
 }

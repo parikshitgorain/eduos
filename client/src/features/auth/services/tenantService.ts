@@ -1,6 +1,14 @@
 import { apiClient } from '../../../config/apiClient';
 
 /**
+ * Tenant contact information
+ */
+export interface TenantContactInfo {
+  email?: string;
+  phone?: string;
+}
+
+/**
  * Tenant interface
  */
 export interface Tenant {
@@ -8,6 +16,7 @@ export interface Tenant {
   name: string;
   location: string;
   logoUrl?: string;
+  contactInfo?: TenantContactInfo;
 }
 
 /**
@@ -50,23 +59,25 @@ class TenantService {
    * @returns Array of matching tenants
    */
   async searchTenants(query: string): Promise<Tenant[]> {
-    if (query.length < 2) {
+    // Trim whitespace and check minimum length
+    const trimmedQuery = query.trim();
+    if (trimmedQuery.length < 2) {
       return [];
     }
 
-    // Check cache first
-    if (this.searchCache.has(query)) {
-      return this.searchCache.get(query)!;
+    // Check cache first (use trimmed query for cache key)
+    if (this.searchCache.has(trimmedQuery)) {
+      return this.searchCache.get(trimmedQuery)!;
     }
 
     const response = await apiClient.get<TenantSearchResponse>('/api/v1/tenants/search', {
-      params: { q: query },
+      params: { q: trimmedQuery },
     });
 
     const tenants = response.data.tenants;
     
     // Cache the results
-    this.searchCache.set(query, tenants);
+    this.searchCache.set(trimmedQuery, tenants);
 
     return tenants;
   }
@@ -98,7 +109,7 @@ class TenantService {
         const tenants = await this.searchTenants(query);
         callback(tenants);
       } catch (error) {
-        console.error('Tenant search error:', error);
+        // Silently fail and return empty results
         callback([]);
       }
     }, delay);
